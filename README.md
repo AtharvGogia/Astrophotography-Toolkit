@@ -1,4 +1,4 @@
-Astrophotography Toolkit (Work in Progress)-
+Astrophotography Toolkit (Work in Progress) -
 This is a web-based toolkit for astrophotographers. It includes an NPF exposure calculator with a skymap preview and an image analyzer powered by Astrometry.net.
 
 How It Works-
