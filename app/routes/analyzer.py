@@ -1,15 +1,19 @@
 """Image analyzer API: plate-solve an uploaded photo and label what is in it.
 
 POST /api/analyze            multipart: image (file), optional fov_hint (degrees)
-                             -> {job_id}, plus {job} with the finished result when SYNC_JOBS is on
+                             -> {job_id}, plus {job} with the finished result when SYNC_JOBS is on.
+                             With SYNC_JOBS and Accept: application/x-ndjson, the reply streams one
+                             JSON line per progress update while it solves, then {job_id, job}.
 GET  /api/jobs/<id>          state, progress, message, result
 GET  /api/jobs/<id>/preview  JPEG preview of the uploaded photo
 """
 import base64
 import io
+import json
 import math
+import time
 
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, jsonify, request, stream_with_context
 from PIL import Image
 
 from .. import annotate, imageio, jobs, ratelimit, settings, solver
@@ -55,12 +59,32 @@ def analyze():
         if not math.isfinite(fov_hint) or not 0.1 <= fov_hint <= 180:
             return jsonify({'error': 'fov_hint must be between 0.1 and 180 degrees.'}), 400
     data = file.read()
+    if settings.SYNC_JOBS and 'application/x-ndjson' in request.headers.get('Accept', ''):
+        return _streamed(jobs.submit(_run, data, file.filename, fov_hint, sync='thread'))
     job = jobs.submit(_run, data, file.filename, fov_hint, sync=settings.SYNC_JOBS)
     if settings.SYNC_JOBS:
         body = {'job_id': job.id, 'job': job.to_dict()}
         jobs.discard(job.id)          # nothing about the photo is kept once the answer is sent
         return jsonify(body), 200
     return jsonify({'job_id': job.id}), 202
+
+
+def _streamed(job):
+    """Progress lines while the job runs, then the finished job; nothing is kept afterwards."""
+    def lines():
+        last = None
+        try:
+            while job.state not in ('done', 'failed'):
+                now = (round(job.progress, 3), job.message)
+                if now != last:
+                    last = now
+                    yield json.dumps({'progress': now[0], 'message': now[1]}) + '\n'
+                time.sleep(0.25)
+            yield json.dumps({'job_id': job.id, 'job': job.to_dict()}) + '\n'
+        finally:
+            jobs.discard(job.id)
+    return Response(stream_with_context(lines()), mimetype='application/x-ndjson',
+                    headers={'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no'})
 
 
 @bp.get('/jobs/<job_id>')

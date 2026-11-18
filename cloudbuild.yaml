@@ -1,0 +1,41 @@
+# Continuous deployment: a Cloud Build trigger runs this on every push to main.
+# It builds the image, stores it in Artifact Registry, and deploys it to Cloud Run with the same
+# settings as the manual deploy in docs/DEPLOY_CLOUD_RUN.md.
+
+substitutions:
+  _REGION: asia-south1
+  _SERVICE: astro-toolkit
+  _IMAGE: asia-south1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/astro-toolkit
+
+steps:
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args: ["build", "-t", "${_IMAGE}:${SHORT_SHA}", "-t", "${_IMAGE}:latest", "."]
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args: ["push", "--all-tags", "${_IMAGE}"]
+
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_IMAGE}:${SHORT_SHA}
+      - --region=${_REGION}
+      - --allow-unauthenticated
+      - --memory=2Gi
+      - --cpu=1
+      - --concurrency=4
+      - --min-instances=0
+      - --max-instances=1
+      - --timeout=120
+      - --cpu-boost
+
+images:
+  - ${_IMAGE}:${SHORT_SHA}
+
+options:
+  logging: CLOUD_LOGGING_ONLY

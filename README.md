@@ -5,6 +5,9 @@ and find out what is in a photo you took. Everything is computed from real star 
 catalogs, on your own computer or on the toolkit's server. There is no account and nothing to sign
 up for.
 
+**Try it: <https://astro.atharvgogia.in>** (the first visit after a quiet spell takes a few seconds
+while the server starts), or [run it on your computer](#running-it-on-your-computer).
+
 ![Tonight at a glance](docs/images/home.png)
 
 ## What it does

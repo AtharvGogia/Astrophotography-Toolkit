@@ -614,6 +614,14 @@ code { font-family: var(--mono); font-size: 0.9em; color: var(--text-dim); }
 .site-footer { margin-top: 5rem; border-top: 1px solid var(--rule); color: var(--text-faint); font-size: var(--fs-meta); }
 .site-footer p { margin: 1.4rem 0 2.4rem; }
 .site-footer a { color: var(--text-dim); }
+/* Profile links: small brand icons in the text colour (red in low-light mode). */
+.site-footer .makers { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 22px; }
+.site-footer .maker { display: inline-flex; align-items: center; gap: 2px; }
+.site-footer .profile-link { display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; transition: color 150ms ease; }
+.site-footer .profile-link svg { width: 16px; height: 16px; fill: currentColor; }
+.site-footer .profile-link:hover { color: var(--accent); }
+.site-footer .profile-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.site-footer .maker > .profile-link:first-of-type { margin-left: 6px; }
 
 /* Small screens --------------------------------------------------------------------- */
 @media (max-width: 900px) {
@@ -920,6 +928,7 @@ html { scrollbar-color: var(--rule) var(--bg); }
     .link-button { padding: 10px 0; margin: -10px 0; }
     .coords summary, .hint-box summary { padding: 11px 0; }
     .site-footer a { display: inline-block; padding: 12px 2px; }
+    .site-footer .profile-link { width: 44px; height: 44px; }
     .sky-slider { height: 44px; }
     .combo-list li { padding-top: 12px; padding-bottom: 12px; }
     .site-title { display: inline-block; padding: 6px 0; }

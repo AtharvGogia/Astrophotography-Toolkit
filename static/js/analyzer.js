@@ -44,6 +44,41 @@
         return data;
     }
 
+    function showProgress(p) {
+        if (typeof p.progress === 'number') $('progressBar').value = Math.round(p.progress * 100);
+        if (p.message) $('progressMsg').textContent = p.message;
+    }
+
+    // Upload the photo. On hosts that solve inside the upload request, the reply streams one JSON
+    // line per progress update and then the finished job; elsewhere it is one JSON object.
+    async function postPhoto(form) {
+        const resp = await fetch('/api/analyze', {
+            method: 'POST', body: form, headers: { Accept: 'application/x-ndjson, application/json' } });
+        const type = resp.headers.get('Content-Type') || '';
+        if (!resp.ok || !type.includes('ndjson') || !resp.body) {
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) throw new Error(data.error || `Request failed (${resp.status})`);
+            return data;
+        }
+        const reader = resp.body.pipeThrough(new TextDecoderStream()).getReader();
+        let buf = '', last = null;
+        for (;;) {
+            const { value, done } = await reader.read();
+            if (value) buf += value;
+            let nl;
+            while ((nl = buf.indexOf('\n')) >= 0) {
+                const line = buf.slice(0, nl).trim();
+                buf = buf.slice(nl + 1);
+                if (!line) continue;
+                last = JSON.parse(line);
+                if (last.job) return last;
+                showProgress(last);
+            }
+            if (done) break;
+        }
+        throw new Error('The connection closed before the photo was solved. Please try again.');
+    }
+
     // ---- Overlay --------------------------------------------------------------------------
     function el(name, attrs, text) {
         const node = document.createElementNS(SVG, name);
@@ -261,15 +296,14 @@
             form.append('image', upload);
             const hint = fovHint();
             if (hint) form.append('fov_hint', hint.toFixed(2));
-            const started = await getJSON('/api/analyze', { method: 'POST', body: form });
+            const started = await postPhoto(form);
 
             // Some hosts solve inside the upload request and send the finished job straight back.
             let job = started.job;
             while (!job || (job.state !== 'done' && job.state !== 'failed')) {
                 await sleep(POLL_MS);
                 job = await getJSON(`/api/jobs/${started.job_id}`);
-                $('progressBar').value = Math.round(job.progress * 100);
-                $('progressMsg').textContent = job.message;
+                showProgress(job);
             }
             if (job.state === 'failed') throw new Error(job.error || 'The photo could not be solved.');
 

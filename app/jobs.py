@@ -43,7 +43,8 @@ def submit(fn, *args, sync=False, **kwargs):
 
     sync=True is for hosts that only give the process CPU while a request is open (Cloud Run):
     the job finishes before the response is sent, and the browser's first poll sees the result.
-    At most two run at once either way, to bound memory use.
+    sync='thread' starts it at once on its own thread, for a request that streams its progress.
+    At most two run at once any way, to bound memory use.
     """
     job = Job()
     with _lock:
@@ -61,7 +62,14 @@ def submit(fn, *args, sync=False, **kwargs):
                 traceback.print_exc()
             job.state, job.error, job.message = 'failed', str(exc) or type(exc).__name__, 'Failed'
 
-    if sync:
+    if sync == 'thread':
+        # Runs now, inside the current request, but on its own thread so the request can stream
+        # progress while it works (the host still gives CPU, as the request is open).
+        def guarded():
+            with _sync_slots:
+                run()
+        threading.Thread(target=guarded, daemon=True).start()
+    elif sync:
         with _sync_slots:
             run()
     else:

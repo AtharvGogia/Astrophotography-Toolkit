@@ -69,7 +69,24 @@ sky map). At the end it prints the address, like `https://astro-toolkit-xxxxxxxx
 
 ## 4. Updating
 
-Run the same deploy command again after pulling or changing code. Each deploy makes a new
+**Automatic (set up for the live site):** a Cloud Build trigger, `deploy-on-push-main` in
+`asia-south1`, runs `cloudbuild.yaml` on every push to `main`. It builds the image, pushes it to
+Artifact Registry and deploys it with the settings above. Pushes that only change `README.md`,
+`docs/`, `tests/`, `deploy/` or release notes are skipped. Builds take about 5–8 minutes; follow
+them under Cloud Build → History in the console.
+
+To set this up on another project, run the deploy above once, then:
+
+1. Create a service account for builds and give it `roles/run.admin`,
+   `roles/artifactregistry.writer`, `roles/logging.logWriter`, and `roles/iam.serviceAccountUser`
+   on the Cloud Run runtime account.
+2. Connect GitHub: `gcloud builds connections create github NAME --region=REGION`, then open the
+   link it prints and approve the Cloud Build app for the repository.
+3. Link the repository (`gcloud builds repositories create`) and create the trigger
+   (`gcloud builds triggers create github ... --branch-pattern='^main$'
+   --build-config=cloudbuild.yaml --service-account=...`).
+
+**Manual:** run the same deploy command again from the repository folder. Each deploy makes a new
 revision; Cloud Run switches traffic to it once it starts successfully.
 
 ## What changes when hosted

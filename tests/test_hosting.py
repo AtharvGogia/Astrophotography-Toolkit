@@ -1,5 +1,6 @@
 """Hosted-mode behaviour (Cloud Run settings): solve in the request, keep nothing, limits, health check."""
 import io
+import json
 
 import numpy as np
 import pytest
@@ -36,6 +37,20 @@ def test_sync_mode_returns_result_inline_and_keeps_nothing(hosted):
     assert body['job']['state'] == 'done', body['job']['error']
     assert body['job']['result']['preview'].startswith('data:image/jpeg;base64,')
     assert jobs.get(body['job_id']) is None                     # discarded after answering
+
+
+def test_sync_mode_streams_progress_when_asked(hosted):
+    img, _ = synthetic_field(83.8, -5.4, 0, width=1500, height=1000)
+    resp = hosted.post('/api/analyze', data={'image': (io.BytesIO(_png(img)), 'orion.png')},
+                       content_type='multipart/form-data',
+                       headers={'X-Forwarded-For': '203.0.113.6', 'Accept': 'application/x-ndjson'})
+    assert resp.status_code == 200 and resp.mimetype == 'application/x-ndjson'
+    lines = [json.loads(line) for line in resp.get_data(as_text=True).splitlines() if line]
+    steps, final = lines[:-1], lines[-1]
+    assert steps and all('progress' in s and 'message' in s for s in steps)
+    assert final['job']['state'] == 'done', final['job']['error']
+    assert final['job']['result']['preview'].startswith('data:image/jpeg;base64,')
+    assert jobs.get(final['job_id']) is None                    # discarded after answering
 
 
 def test_rate_limit_per_visitor(hosted):
