@@ -44,6 +44,13 @@ constellation figures, named stars, nebulae, clusters and galaxies, and an optio
 Labels are limited to the starry part of the frame; trees, hills and buildings are detected and
 their overlays hidden, with an **Over foreground** toggle to show them.
 
+<p align="center"><img src="docs/images/analyzer.jpg" width="600" alt="A wide-field photo of Orion, solved and labelled by the Analyzer"></p>
+
+<sub>Solved in 3.1 s to 1.2 px accuracy (16.8° × 25.0° field). Photo: "Orion 3008 huge" by
+<a href="https://commons.wikimedia.org/wiki/File:Orion_3008_huge.jpg">Mouser</a>, Wikimedia Commons,
+<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a>; the annotated version
+above is shared under the same licence.</sub>
+
 ### Around the app
 - **Location**: set once from the header (your browser's location, or typed coordinates) and stored
   only in your browser. Times show in your computer's time zone.
