@@ -33,4 +33,9 @@ catalog_raw/
 app/solver/cache/
 
 # Output of scripts/prebuild.py when run locally
-data/
+/data/
+
+# Cloudflare Worker dependencies
+deploy/cloudflare-worker/node_modules/
+deploy/cloudflare-worker/.cloudflare/
+deploy/cloudflare-worker/.wrangler/

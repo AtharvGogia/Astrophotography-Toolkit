@@ -352,8 +352,14 @@ button.primary:disabled { opacity: 0.6; cursor: progress; }
     outline-offset: 6px;
 }
 .viewfinder > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.viewfinder.photo { aspect-ratio: auto; }
-.viewfinder.photo > img { position: static; display: block; height: auto; }
+/* A solved photo fits the screen: tall (portrait) photos are limited by height, and the frame
+   shrinks to the image so the overlay stays registered on it. */
+.viewfinder.photo { aspect-ratio: auto; width: fit-content; max-width: 100%; }
+.viewfinder.photo > img {
+    position: static; display: block;
+    width: auto; height: auto; max-width: 100%;
+    max-height: max(420px, calc(100vh - 290px)); max-height: max(420px, calc(100svh - 290px));
+}
 .corner { position: absolute; width: 18px; height: 18px; border: 0 solid var(--accent); pointer-events: none; z-index: 2; }
 .corner.tl { top: -7px; left: -7px; border-top-width: 2px; border-left-width: 2px; }
 .corner.tr { top: -7px; right: -7px; border-top-width: 2px; border-right-width: 2px; }
@@ -512,12 +518,29 @@ progress::-moz-progress-bar { background: var(--accent-fill); }
 .progress-msg { margin: var(--fs-eyebrow) 0 0; color: var(--text-dim); font-size: var(--fs-ui); }
 code { font-family: var(--mono); font-size: 0.9em; color: var(--text-dim); }
 
-.analysis { margin-top: 3rem; }
-.analysis .viewfinder-figure { margin-bottom: 3rem; }
-.analysis .analysis-cols { grid-template-columns: 1fr 1.4fr; }
-.analysis .stats { grid-template-columns: 1fr 1fr; }
-.analysis .stats div:nth-child(odd) { padding-left: 0; border-left: 0; }
-.analysis .stats div:nth-child(n+3) { border-top: 1px solid var(--rule-soft); }
+/* Analyzer: form on the left (as on Framing); the answer panel and the photo on the right,
+   with the list of objects underneath. */
+.analysis-grid {
+    display: grid; gap: 0 40px; align-items: start;
+    grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
+    grid-template-areas: ". layers" "panel photo" ". caption";
+}
+.analysis-grid .layer-bar { grid-area: layers; }
+.analysis-grid .viewfinder.photo { grid-area: photo; }
+.analysis-grid .photo-caption { grid-area: caption; margin: 0.9rem 0 0; font-size: var(--fs-meta); line-height: 1.6; color: var(--text-faint); max-width: var(--measure); }
+/* The panel runs the height of the photo, its rows spread evenly down it. */
+.analysis-grid .solution-panel { grid-area: panel; align-self: stretch; display: flex; flex-direction: column; margin: 0; }
+.analysis-grid .solution-panel .stats { flex: 1; grid-auto-rows: 1fr; }
+@media (max-width: 1100px) {
+    .analysis-grid { grid-template-columns: 1fr; grid-template-areas: "panel" "layers" "photo" "caption"; }
+    .analysis-grid .solution-panel { margin-bottom: 1.6rem; }
+    .analysis-grid .solution-panel .stats { grid-auto-rows: auto; }
+}
+.calc-form .hint-box { margin-bottom: 1.2rem; }
+.analysis .objects { margin-top: 2.4rem; }
+.analysis .objects .section-head { font-size: var(--fs-subhead); margin: 0 0 0.6rem; }
+.results .progress-block { margin-top: 0; }
+.calc-form .solver-range { margin-top: 0.6rem; }
 
 .layer-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
 .layer, .layer-fg {
@@ -846,8 +869,11 @@ input[type="date"] {
 .stats.stack { grid-template-columns: 1fr 1fr; margin: 0; border-top: 0; border-bottom: 0; }
 .stats.stack div, .stats.stack div + div { padding: 10px 12px 10px 0; border-left: 0; border-top: 1px solid var(--rule-soft); }
 .stats.stack .wide { grid-column: 1 / -1; }
+.stats.stack { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.stats.stack dt { white-space: normal; }
 .result-layout .viewfinder-figure { min-width: 0; }
 .result-layout .viewfinder { width: min(100%, calc((100vh - 270px) * var(--ar, 1.5))); }
+.result-layout .viewfinder.photo { width: fit-content; }
 .result-layout figcaption { margin-top: 0.9rem; }
 @media (max-width: 1100px) {
     .result-layout:not([hidden]) { grid-template-columns: 1fr; }

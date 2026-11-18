@@ -92,7 +92,28 @@ Uploaded photos are processed in memory and dropped as soon as the answer is sen
 gcloud run services logs read astro-toolkit --region asia-south1 --limit 50
 ```
 
-`/healthz` on the site returns `{"ok": true, ...}` when the app is up.
+`/health` on the site returns `{"ok": true, ...}` when the app is up.
+
+## A custom domain through Cloudflare
+
+The live site is served at `astro.atharvgogia.in` by a small Cloudflare Worker in
+`deploy/cloudflare-worker/`. Cloud Run picks the service by the Host header, so a plain DNS record
+pointing at the `run.app` address doesn't work; the Worker forwards each request with Cloud Run's
+own host. While a cold start takes more than 2.5 s, page visits get a short "Firing up the
+server…" page that waits for `/health` and then loads the page.
+
+To change the domain or the Cloud Run address, edit `cloudflare.config.ts` (`domains`) or
+`src/index.ts` (`ORIGIN`), then from that folder:
+
+```bash
+npm install
+```
+
+```bash
+npx cf deploy
+```
+
+`cf` creates the DNS record for the custom domain itself. The zone must be active on Cloudflare.
 
 ## Running the same image elsewhere
 

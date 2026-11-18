@@ -23,6 +23,9 @@ def create_app(load_skymap=True):
             return jsonify({'error': msg}), 413
         return msg, 413
 
+    # /health is the one to use on Cloud Run, which reserves paths ending in "z" (/healthz there
+    # is answered by Google's front end, not the app).
+    @app.get('/health')
     @app.get('/healthz')
     def healthz():
         return {'ok': True, 'skymap': skymap.is_loaded()}

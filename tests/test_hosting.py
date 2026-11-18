@@ -61,3 +61,4 @@ def test_hosted_wording_and_health(hosted):
     assert "solved on this site's server" in page and 'nothing is uploaded anywhere' not in page
     assert 'data-max-upload-mb="1"' in page
     assert hosted.get('/healthz').get_json()['ok'] is True
+    assert hosted.get('/health').get_json()['ok'] is True

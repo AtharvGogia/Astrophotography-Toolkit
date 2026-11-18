@@ -248,6 +248,7 @@
         btn.disabled = true;
         btn.textContent = 'Working…';
         $('output').hidden = true;
+        $('resultsEmpty').hidden = true;
         $('progress').hidden = false;
         $('progressBar').value = 0;
         $('progressMsg').textContent = `Sending ${file.name} to the solver…`;

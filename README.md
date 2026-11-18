@@ -90,7 +90,9 @@ The first start builds the plate-solving index (a few seconds, about 30 MB in
 The `Dockerfile` builds a container that runs anywhere Docker does. It is set up for
 [Google Cloud Run](https://cloud.google.com/run), which scales to zero when nobody is using it, so
 a hobby site usually costs nothing. Step-by-step instructions are in
-[docs/DEPLOY_CLOUD_RUN.md](docs/DEPLOY_CLOUD_RUN.md).
+[docs/DEPLOY_CLOUD_RUN.md](docs/DEPLOY_CLOUD_RUN.md). The public copy runs at <https://astro.atharvgogia.in>, behind a
+Cloudflare Worker (`deploy/cloudflare-worker/`) that also shows a short "starting up" page while
+Cloud Run wakes from idle.
 
 The container sets these for public hosting (all optional when running locally):
 

@@ -4,74 +4,87 @@
 {% block lede %}Find out exactly where a night-sky photo points and what is in it: constellations,
 named stars, nebulae, clusters and galaxies. {% if hosted %}Your photo is solved on this site's server and is not kept afterwards.{% else %}Everything runs on your computer; nothing is uploaded anywhere.{% endif %}{% endblock %}
 {% block content %}
-<form id="analyzeForm" class="upload-form" novalidate data-max-upload-mb="{{ max_upload_mb }}">
-    <div class="field">
-        <label for="imageUpload">Photo</label>
-        <input type="file" id="imageUpload"
-               accept=".jpg,.jpeg,.png,.tif,.tiff,.fit,.fits,.fts,.cr2,.cr3,.nef,.arw,.raf,.orf,.rw2,.dng,.pef">
-        <p class="note">JPG, PNG, TIFF or FITS{% if hosted %}. For camera RAW files, export a JPG or TIFF first{% else %}. Camera RAW files (CR2, NEF, ARW…) work once the optional rawpy package is installed{% endif %}.</p>
-    </div>
-    <details class="hint-box">
-        <summary>Lens details (optional, speeds things up)</summary>
-        <div class="field-row">
+<div class="split">
+    <form id="analyzeForm" class="calc-form" novalidate data-max-upload-mb="{{ max_upload_mb }}">
+        <fieldset>
+            <legend>Photo</legend>
             <div class="field">
-                <label for="cameraPreset">Camera</label>
-                <select id="cameraPreset"><option value="">Unknown</option></select>
+                <label for="imageUpload">Image file</label>
+                <input type="file" id="imageUpload"
+                       accept=".jpg,.jpeg,.png,.tif,.tiff,.fit,.fits,.fts,.cr2,.cr3,.nef,.arw,.raf,.orf,.rw2,.dng,.pef">
+                <p class="note">JPG, PNG, TIFF or FITS{% if hosted %}. For camera RAW files, export a JPG or TIFF first{% else %}. Camera RAW files (CR2, NEF, ARW…) work once the optional rawpy package is installed{% endif %}.</p>
             </div>
-            <div class="field">
-                <label for="hintFocal">Focal length (mm)</label>
-                <input type="number" id="hintFocal" min="1" step="any" placeholder="24">
+        </fieldset>
+        <details class="hint-box">
+            <summary>Lens details (optional, speeds things up)</summary>
+            <div class="field-row">
+                <div class="field">
+                    <label for="cameraPreset">Camera</label>
+                    <select id="cameraPreset"><option value="">Unknown</option></select>
+                </div>
+                <div class="field">
+                    <label for="hintFocal">Focal (mm)</label>
+                    <input type="number" id="hintFocal" min="1" step="any" placeholder="24">
+                </div>
+            </div>
+        </details>
+        <button type="submit" id="analyzeBtn" class="primary">Analyze</button>
+        <p class="error" id="analyzerError" role="alert"></p>
+        <p class="note solver-range">Works best with camera-lens shots, from about 15 mm to 135 mm on a
+        full-frame camera (fields of view from 10° to 90°). Telescope close-ups are not supported yet.</p>
+    </form>
+
+    <section class="results" aria-live="polite">
+        <div id="resultsEmpty" class="empty">
+            <p class="kicker">Analysis</p>
+            <p>Choose a night-sky photo, then press <em>Analyze</em>.</p>
+            <p class="muted">The photo is plate-solved against a star catalog to find where it points, then
+            labelled with constellation figures, named stars and deep-sky objects.</p>
+        </div>
+
+        <div id="progress" class="progress-block" hidden>
+            <p class="kicker">Working</p>
+            <div class="progress-line">
+                <progress id="progressBar" value="0" max="100"></progress>
+                <span id="elapsed">0:00</span>
+            </div>
+            <p class="progress-msg" id="progressMsg"></p>
+        </div>
+
+        <div id="output" class="analysis" hidden>
+            <!-- Grid: the layer buttons sit above the photo; the panel spans the photo's height. -->
+            <div class="analysis-grid">
+                <div class="layer-bar" role="group" aria-label="Show on photo">
+                    <button type="button" class="layer" data-layer="constellations" aria-pressed="true">Constellations</button>
+                    <button type="button" class="layer" data-layer="stars" aria-pressed="true">Stars</button>
+                    <button type="button" class="layer" data-layer="dsos" aria-pressed="true">Deep sky</button>
+                    <button type="button" class="layer" data-layer="grid" aria-pressed="false">RA/Dec grid</button>
+                    <button type="button" class="layer-fg" id="fgToggle" aria-pressed="false" hidden
+                            title="Also show lines and labels over the landscape, where the photo shows no stars">Over foreground</button>
+                </div>
+                <div class="answer-panel solution-panel">
+                    <p class="kicker">Where it points</p>
+                    <dl class="stats stack" id="solutionStats"></dl>
+                </div>
+                <div class="viewfinder photo" id="photoFrame">
+                    <img id="photo" alt="Your photo">
+                    <svg id="overlay" class="overlay" preserveAspectRatio="none" aria-hidden="true"></svg>
+                    <span class="corner tl"></span><span class="corner tr"></span>
+                    <span class="corner bl"></span><span class="corner br"></span>
+                </div>
+                <p class="photo-caption" id="photoCaption"></p>
+            </div>
+
+            <div class="objects">
+                <h2 class="section-head">In this photo</h2>
+                <table class="object-table">
+                    <thead><tr><th>Name</th><th>Type</th><th>Constellation</th></tr></thead>
+                    <tbody id="objectRows"></tbody>
+                </table>
             </div>
         </div>
-    </details>
-    <button type="submit" id="analyzeBtn" class="primary">Analyze</button>
-    <p class="error" id="analyzerError" role="alert"></p>
-</form>
-<p class="note solver-range">Works best with camera-lens shots, from about 15 mm to 135 mm on a full-frame camera
-(fields of view from 10° to 90°). Telescope close-ups are not supported yet.</p>
-
-<section id="progress" class="progress-block" hidden>
-    <p class="kicker">Working</p>
-    <div class="progress-line">
-        <progress id="progressBar" value="0" max="100"></progress>
-        <span id="elapsed">0:00</span>
-    </div>
-    <p class="progress-msg" id="progressMsg"></p>
-</section>
-
-<section id="output" class="analysis" hidden>
-    <div class="layer-bar" role="group" aria-label="Show on photo">
-        <button type="button" class="layer" data-layer="constellations" aria-pressed="true">Constellations</button>
-        <button type="button" class="layer" data-layer="stars" aria-pressed="true">Stars</button>
-        <button type="button" class="layer" data-layer="dsos" aria-pressed="true">Deep sky</button>
-        <button type="button" class="layer" data-layer="grid" aria-pressed="false">RA/Dec grid</button>
-        <button type="button" class="layer-fg" id="fgToggle" aria-pressed="false" hidden
-                title="Also show lines and labels over the landscape, where the photo shows no stars">Over foreground</button>
-    </div>
-    <figure class="viewfinder-figure">
-        <div class="viewfinder photo" id="photoFrame">
-            <img id="photo" alt="Your photo">
-            <svg id="overlay" class="overlay" preserveAspectRatio="none" aria-hidden="true"></svg>
-            <span class="corner tl"></span><span class="corner tr"></span>
-            <span class="corner bl"></span><span class="corner br"></span>
-        </div>
-        <figcaption id="photoCaption"></figcaption>
-    </figure>
-
-    <div class="analysis-cols">
-        <div>
-            <p class="kicker">Where it points</p>
-            <dl class="stats" id="solutionStats"></dl>
-        </div>
-        <div>
-            <p class="kicker">In this photo</p>
-            <table class="object-table">
-                <thead><tr><th>Name</th><th>Type</th><th>Constellation</th></tr></thead>
-                <tbody id="objectRows"></tbody>
-            </table>
-        </div>
-    </div>
-</section>
+    </section>
+</div>
 {% endblock %}
 {% block scripts %}
 <script src="{{ asset('js/common.js') }}"></script>
