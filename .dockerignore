@@ -1,0 +1,18 @@
+# Keep the build context small and free of personal or secret files.
+.git
+.gitignore
+.claude
+**/__pycache__
+**/*.pyc
+.pytest_cache
+Samples/
+catalog_raw/
+app/solver/cache/
+data/
+config.py
+.env
+*.log
+tests/
+docs/
+composite_skymap_16k.png
+skymapsplit/

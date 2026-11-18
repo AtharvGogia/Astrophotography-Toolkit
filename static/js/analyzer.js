@@ -72,11 +72,12 @@
 
         const cons = el('g', { class: 'layer-constellations', 'data-layer': 'constellations' });
         for (const line of a.lines || []) {
-            cons.appendChild(el('polyline', { points: line.points.map((p) => p.join(',')).join(' '), class: 'con-line' }));
+            cons.appendChild(el('polyline', { points: line.points.map((p) => p.join(',')).join(' '),
+                                              class: fgClass(line, 'con-line') }));
         }
         for (const c of a.constellations) {
             cons.appendChild(el('text', { x: c.x, y: c.y, 'font-size': fs * (c.share > 0.25 ? 1.6 : 1.2),
-                                          'text-anchor': 'middle', class: 'con-label' }, c.name.toUpperCase()));
+                                          'text-anchor': 'middle', class: fgClass(c, 'con-label') }, c.name.toUpperCase()));
         }
 
         // Labels sit to the right of their marker, or to the left near the right-hand edge.
@@ -84,12 +85,14 @@
         // skipped (the marker stays, and its name shows on hover).
         const placed = [];
         const overlaps = (b) => placed.some((p) => b.x0 < p.x1 && b.x1 > p.x0 && b.y0 < p.y1 && b.y1 > p.y0);
-        const label = (x, y, r, text, size, cls) => {
+        // Foreground labels are placed after all open-sky ones, so they never push one aside.
+        const placedFg = [];
+        const label = (x, y, r, text, size, cls, isFg) => {
             const flip = x > a.width * 0.8;
             const w = text.length * size * 0.56, tx = flip ? x - r - 4 * u : x + r + 4 * u;
             const box = { x0: flip ? tx - w : tx, x1: flip ? tx : tx + w, y0: y - size * 0.85, y1: y + size * 0.25 };
-            if (overlaps(box)) return null;
-            placed.push(box);
+            if (overlaps(box) || (isFg && placedFg.some((p) => box.x0 < p.x1 && box.x1 > p.x0 && box.y0 < p.y1 && box.y1 > p.y0))) return null;
+            (isFg ? placedFg : placed).push(box);
             return el('text', { x: tx, y, 'font-size': size, 'text-anchor': flip ? 'end' : 'start', class: cls }, text);
         };
         const marker = (shape, title) => { shape.appendChild(el('title', {}, title)); return shape; };
@@ -97,28 +100,46 @@
         const stars = el('g', { class: 'layer-stars', 'data-layer': 'stars' });
         const dsos = el('g', { class: 'layer-dsos', 'data-layer': 'dsos' });
         // Bright stars get first claim on label space, then deep-sky objects, then fainter stars.
-        const queue = [
+        const ordered = [
             ...a.stars.filter((s) => s.mag < 2).map((s) => ['star', s]),
             ...a.dsos.map((d) => ['dso', d]),
             ...a.stars.filter((s) => s.mag >= 2).map((s) => ['star', s]),
         ];
+        const queue = [...ordered.filter(([, o]) => !o.fg), ...ordered.filter(([, o]) => o.fg)];
         for (const [kind, o] of queue) {
             if (kind === 'dso') {
                 const r = Math.max(o.r, 7 * u);
-                dsos.appendChild(marker(el('circle', { cx: o.x, cy: o.y, r, class: 'dso-ring' }), `${o.label} (${o.kind})`));
-                const t = label(o.x, o.y + fs * 0.35, r, o.label.replace(' · ', '  '), fs, 'dso-label');
+                dsos.appendChild(marker(el('circle', { cx: o.x, cy: o.y, r, class: fgClass(o, 'dso-ring') }), `${o.label} (${o.kind})`));
+                const t = label(o.x, o.y + fs * 0.35, r, o.label.replace(' · ', '  '), fs, fgClass(o, 'dso-label'), o.fg);
                 if (t) dsos.appendChild(t);
             } else {
                 const r = (o.mag < 1 ? 11 : o.mag < 2.5 ? 9 : 7) * u;
-                stars.appendChild(marker(el('circle', { cx: o.x, cy: o.y, r, class: 'star-ring' }), `${o.full}, mag ${o.mag.toFixed(1)}`));
-                const t = label(o.x, o.y - r * 0.6, r - 1 * u, o.label, fs * 0.95, 'star-label');
+                stars.appendChild(marker(el('circle', { cx: o.x, cy: o.y, r, class: fgClass(o, 'star-ring') }), `${o.full}, mag ${o.mag.toFixed(1)}`));
+                const t = label(o.x, o.y - r * 0.6, r - 1 * u, o.label, fs * 0.95, fgClass(o, 'star-label'), o.fg);
                 if (t) stars.appendChild(t);
             }
         }
 
         // Draw order: grid at the back, constellation names, then objects on top.
         for (const g of [grid, cons, dsos, stars]) svg.appendChild(g);
+        // Once the photo is solved, the figures are drawn across it, then the names fade in.
+        if (!Astro.motion.still()) {
+            const ease = Astro.motion.EASE;
+            [...cons.querySelectorAll('.con-line:not(.fg)')].forEach((l, i) => {
+                l.setAttribute('pathLength', '1');
+                l.animate([{ strokeDasharray: '1 2', strokeDashoffset: 1 }, { strokeDasharray: '1 2', strokeDashoffset: 0 }],
+                          { duration: 700, delay: Math.min(i * 20, 500), easing: ease, fill: 'backwards' });
+            });
+            for (const t of cons.querySelectorAll('text')) t.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400, delay: 600, fill: 'backwards' });
+            for (const g of [dsos, stars]) g.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400, delay: 450, fill: 'backwards' });
+        }
+        $('fgToggle').hidden = !a.foreground;
         syncLayers();
+    }
+
+    // Items the server found to lie over the foreground (no stars visible there) carry fg.
+    function fgClass(item, cls) {
+        return item.fg ? `${cls} fg` : cls;
     }
 
     function syncLayers() {
@@ -127,8 +148,9 @@
             const g = $('overlay').querySelector(`g[data-layer="${btn.dataset.layer}"]`);
             if (g) g.style.display = on ? '' : 'none';
         }
+        $('overlay').classList.toggle('show-fg', $('fgToggle').getAttribute('aria-pressed') === 'true');
     }
-    for (const btn of document.querySelectorAll('.layer')) {
+    for (const btn of document.querySelectorAll('.layer, #fgToggle')) {
         btn.addEventListener('click', () => {
             btn.setAttribute('aria-pressed', String(btn.getAttribute('aria-pressed') !== 'true'));
             syncLayers();
@@ -180,6 +202,36 @@
             `${s.parity_flipped ? ' (the photo appears mirrored)' : ''}.`;
         drawOverlay(a);
         $('output').hidden = false;
+        Astro.revealOnPhone($('output'));
+    }
+
+    // ---- Upload size ------------------------------------------------------------------------
+    // Big JPG/PNG/WebP photos are shrunk in the browser before upload: the solver works on a
+    // ~2000 px copy anyway, uploads get much faster, and hosted servers cap request sizes.
+    const MAX_UPLOAD_MB = Number($('analyzeForm').dataset.maxUploadMb) || 300;
+    const SHRINK_ABOVE_BYTES = Math.min(24, MAX_UPLOAD_MB * 0.8) * 1024 * 1024;
+    const SHRINK_TO_PX = 4096;
+    const BROWSER_DECODABLE = /^image\/(jpeg|png|webp)$/;
+
+    async function prepareUpload(file) {
+        if (file.size <= SHRINK_ABOVE_BYTES) return file;
+        if (!BROWSER_DECODABLE.test(file.type)) {
+            if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+                throw new Error(`That file is ${(file.size / 1048576).toFixed(0)} MB; this site accepts up to ${MAX_UPLOAD_MB} MB. ` +
+                                'Export a JPG and try again.');
+            }
+            return file;
+        }
+        const bitmap = await createImageBitmap(file);
+        const scale = Math.min(1, SHRINK_TO_PX / Math.max(bitmap.width, bitmap.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(bitmap.width * scale);
+        canvas.height = Math.round(bitmap.height * scale);
+        canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        bitmap.close?.();
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+        if (!blob) return file;
+        return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
     }
 
     // ---- Submit ---------------------------------------------------------------------------
@@ -202,19 +254,21 @@
         startClock();
 
         try {
+            const upload = await prepareUpload(file);
+            if (upload !== file) $('progressMsg').textContent = `Shrunk ${file.name} for upload. Sending it to the solver…`;
             const form = new FormData();
-            form.append('image', file);
+            form.append('image', upload);
             const hint = fovHint();
             if (hint) form.append('fov_hint', hint.toFixed(2));
-            const { job_id: jobId } = await getJSON('/api/analyze', { method: 'POST', body: form });
+            const started = await getJSON('/api/analyze', { method: 'POST', body: form });
 
-            let job;
-            for (;;) {
+            // Some hosts solve inside the upload request and send the finished job straight back.
+            let job = started.job;
+            while (!job || (job.state !== 'done' && job.state !== 'failed')) {
                 await sleep(POLL_MS);
-                job = await getJSON(`/api/jobs/${jobId}`);
+                job = await getJSON(`/api/jobs/${started.job_id}`);
                 $('progressBar').value = Math.round(job.progress * 100);
                 $('progressMsg').textContent = job.message;
-                if (job.state === 'done' || job.state === 'failed') break;
             }
             if (job.state === 'failed') throw new Error(job.error || 'The photo could not be solved.');
 

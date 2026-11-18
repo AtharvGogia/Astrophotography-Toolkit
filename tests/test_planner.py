@@ -98,3 +98,29 @@ def test_apis_reject_non_object_json(body):
     for url in ('/api/plan', '/api/tonight', '/api/skymap', '/api/resolve'):
         resp = client.post(url, json=body)
         assert resp.status_code in (400, 404, 503), (url, resp.status_code)
+
+
+@pytest.fixture
+def client():
+    return create_app(load_skymap=False).test_client()
+
+
+def test_sky_chart_endpoint(client):
+    r = client.get('/api/skychart?lat=28.45&lon=77.02&start=2026-11-18T06:30:00')
+    assert r.status_code == 200
+    d = r.get_json()
+    assert len(d['stars']) > 1000 and any(s[-1] == 'Vega' for s in d['stars'] if len(s) > 4)
+    assert len(d['lines']) > 100 and len(d['names']) >= 88
+    assert set(d['bodies']) >= {'moon', 'sun', 'jupiter', 'saturn'}
+    assert len(d['body_times']) == len(d['bodies']['moon'])
+    assert 0 <= d['moon']['illumination'] <= 1
+    # The galactic centre is in Sagittarius, near RA 266°, Dec −29°.
+    ra, dec = d['galactic_centre']
+    assert abs(ra - 266.4) < 0.5 and abs(dec + 28.9) < 0.5
+    assert client.get('/api/skychart?lat=91&lon=0&start=2026-11-18T06:30:00').status_code == 400
+    assert client.get('/api/skychart?lat=10&lon=0').status_code == 400
+
+
+def test_plan_returns_target_position(client):
+    r = client.post('/api/plan', json={'lat': 28.45, 'lon': 77.02, 'start': '2026-11-18T06:30:00', 'ra': 83.82, 'dec': -5.39})
+    assert r.get_json()['target'] == {'ra': 83.82, 'dec': -5.39}

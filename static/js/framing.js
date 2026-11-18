@@ -11,12 +11,33 @@
     const MAX_TAN = Math.tan(70 * Math.PI / 180);
     const contextFactor = (halfDiagMm, F) => Math.max(1, Math.min(2, MAX_TAN / (halfDiagMm / F)));
 
+    // The view settles like a camera slewing onto the target: the sky drifts in, and the frame
+    // outline turns from a little off-angle into its real rotation. Reduced motion just fades.
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    function enterFrame(box, img, lines, rotation) {
+        const ease = 'cubic-bezier(0.16, 1, 0.3, 1)';
+        const targets = [img, lines];
+        if (reduceMotion) {
+            for (const e of [...targets, box]) e.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, fill: 'backwards' });
+            return;
+        }
+        const pan = [{ opacity: 0, transform: 'translate(-3%, 2%) scale(1.1)' }, { opacity: 1, transform: 'none' }];
+        for (const e of targets) e.animate(pan, { duration: 1100, easing: ease, fill: 'backwards' });
+        if (!box.hidden) {
+            box.animate([
+                { opacity: 0, transform: `translate(-50%, -50%) rotate(${-rotation + 18}deg) scale(1.12)` },
+                { opacity: 1, transform: `translate(-50%, -50%) rotate(${-rotation}deg) scale(1)` },
+            ], { duration: 900, delay: 150, easing: ease, fill: 'backwards' });
+        }
+    }
+
     Astro.restoreFields(FIELDS);
     const search = TargetSearch.attach($('targetName'), $('targetList'), $('targetInfo'));
     try { search.restore(JSON.parse(localStorage.getItem('astro-target') || 'null')); } catch (e) { /* ignore */ }
     $('targetName').addEventListener('target-picked', (e) => {
         try { localStorage.setItem('astro-target', JSON.stringify(e.detail)); } catch (err) { /* ignore */ }
     });
+    Astro.linkTargetInputs($('targetName'), $('customRA'), $('customDec'), $('coordsBox'));
     Astro.loadCameraPresets($('cameraPreset'), (cam) => {
         $('sensorWidth').value = cam.widthPx;
         $('sensorHeight').value = cam.heightPx;
@@ -70,7 +91,7 @@
 
         // ---- Numbers ----------------------------------------------------------------
         const wMm = p * wPx / 1000, hMm = p * hPx / 1000, dMm = Math.hypot(wMm, hMm);
-        $('targetLabel').textContent = haveCoords ? `RA ${ra}°, Dec ${dec}°` : name;
+        $('targetLabel').textContent = Astro.targetLabel(picked, name, ra, dec, haveCoords);
         $('resFov').textContent = `${Astro.fovDeg(wMm, F).toFixed(2)}° × ${Astro.fovDeg(hMm, F).toFixed(2)}°`;
         $('resDiag').textContent = `${Astro.fovDeg(dMm, F).toFixed(2)}°`;
         $('resScale').textContent = `${(206.265 * p / F).toFixed(2)}″/px`;
@@ -78,11 +99,13 @@
         $('resDec').textContent = TargetSearch.fmtDec(center.dec);
         $('resultsEmpty').hidden = true;
         $('resultsBody').hidden = false;
+        Astro.revealOnPhone(document.querySelector('.results'), $('framingForm'));
 
         // ---- Frame outline over a wider, north-up view --------------------------------
         const ctx = contextFactor(dMm / 2, F);
         const view = $('framingView');
         view.style.aspectRatio = `${wPx} / ${hPx}`;
+        view.style.setProperty('--ar', wPx / hPx);
         const box = $('fovOutline');
         box.style.width = `${100 / ctx}%`;
         box.style.height = `${100 / ctx}%`;
@@ -90,6 +113,7 @@
         // an anticlockwise turn on screen, so CSS gets the negative angle.
         box.style.transform = `translate(-50%, -50%) rotate(${-rotation}deg)`;
         box.hidden = ctx <= 1.001;     // no room for context: the whole view is the frame
+        box.style.visibility = 'hidden';   // shown (and animated in) once the sky is ready
         $('framingCaption').textContent = ctx > 1.001
             ? `The outline is your frame; the view shows ${ctx.toFixed(1)}× more sky around it. North is up, east is left.`
             : 'This lens is too wide to show extra sky around the frame; the whole view is your frame. North is up, east is left.';
@@ -99,6 +123,8 @@
         $('skyStatus').textContent = 'Drawing the sky…';
         const skyPayload = { ra: center.ra, dec: center.dec, focal_length: F, sensor_width_px: wPx,
                              sensor_height_px: hPx, pixel_pitch: p, rotation_deg: 0, context: ctx };
+        $('skyLines').style.visibility = 'hidden';     // no lines floating over an empty box
+        $('skyStatus').classList.remove('is-error');
         Astro.loadSkyLines($('skyLines'), skyPayload);
         try {
             const resp = await Astro.postJSON('/api/skymap', skyPayload);
@@ -109,9 +135,16 @@
             if (skyUrl) URL.revokeObjectURL(skyUrl);
             skyUrl = URL.createObjectURL(await resp.blob());
             img.src = skyUrl;
+            await img.decode().catch(() => {});
             img.hidden = false;
+            box.style.visibility = '';
+            $('skyLines').style.visibility = '';
             $('skyStatus').textContent = '';
+            enterFrame(box, img, $('skyLines'), rotation);
         } catch (err) {
+            box.style.visibility = '';
+            $('skyLines').style.visibility = '';
+            $('skyStatus').classList.add('is-error');
             $('skyStatus').textContent = err.message;
         }
     });

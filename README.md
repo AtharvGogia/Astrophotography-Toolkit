@@ -1,27 +1,61 @@
 # Astrophotography Toolkit
 
-A small web app for night-sky photographers, run locally on your own computer.
+A web app for night-sky photographers: plan the night, work out your exposure, check your framing,
+and find out what is in a photo you took. Everything is computed from real star and deep-sky
+catalogs, on your own computer or on the toolkit's server. There is no account and nothing to sign
+up for.
 
-- **Home**: tonight at a glance for your location: when it gets dark, the Moon, and the showpiece
-  objects that are best placed tonight.
-- **Planner**: whether a target clears the horizon on a given night, when it rises, peaks and sets,
-  which way to look, the best dark window above your chosen altitude, twilight times, and the Moon's
-  phase, rise and set, plus a 30-night Moon calendar with the next new and full Moons.
-- **Exposure**: the longest shutter time before stars trail, using Frédéric Michaud's NPF
-  rule. It also shows a 3 × 3 map of how the limit changes across your sensor, drawn over the
-  sky your camera will see.
-- **Framing**: your camera frame outlined on the real sky around a target, with field of view,
-  pixel scale and rotation.
-- **Analyzer**: open a photo to find exactly where it points and what is in it. It plate-solves
-  the photo on your computer (no internet, no account), draws the constellation figures and labels
-  named stars, nebulae, clusters and galaxies, with an optional RA/Dec grid.
+![Tonight at a glance](docs/images/home.png)
 
-Your observing location is set once from the header ("Use my current location" asks the browser, or
-type coordinates). It is stored only in your browser. Times are shown in your computer's time zone.
-Target names autocomplete as you type, from built-in star and deep-sky catalogs (works offline).
-A red low-light mode keeps your eyes dark-adapted at the telescope.
+## What it does
 
-## Setup
+### Tonight
+The home page answers "is tonight worth going out?" for your location: the best moonless window,
+twilight and Moon times, the Moon's phase, and the showpiece objects best placed tonight.
+
+### Planner
+Pick a target and a night. The planner tells you whether it clears your minimum altitude, when it
+rises, peaks and sets, which way to look, and the best dark window, taking the Moon into account.
+It shows an altitude chart for the whole night, a 30-night Moon calendar (click a night to plan it),
+and an all-sky chart of the sky at any moment. Press **Play the night** to watch the sky turn from
+sunset to sunrise.
+
+![The planner](docs/images/planner.png)
+
+![Playing the night on the sky chart](docs/images/planner-night.gif)
+
+### Exposure
+The longest shutter time before stars trail, from Frédéric Michaud's NPF rule (the full formula,
+not the simplified one). A 3 × 3 map shows how the limit changes across your sensor, drawn over the
+sky your camera will actually see, with constellation figures.
+
+![The exposure calculator](docs/images/exposure.png)
+
+### Framing
+Your camera frame outlined on the real sky around a target, with field of view, pixel scale and
+rotation. The frame turns and settles into place, the way the camera would.
+
+![Framing a target](docs/images/framing.gif)
+
+### Analyzer
+Open a photo to find exactly where it points and what is in it. It is plate-solved on the server or
+your computer (no astrometry.net, no internet needed when run locally), then annotated with
+constellation figures, named stars, nebulae, clusters and galaxies, and an optional RA/Dec grid.
+Labels are limited to the starry part of the frame; trees, hills and buildings are detected and
+their overlays hidden, with an **Over foreground** toggle to show them.
+
+### Around the app
+- **Location**: set once from the header (your browser's location, or typed coordinates) and stored
+  only in your browser. Times show in your computer's time zone.
+- **Target search**: names autocomplete from the built-in catalogs and work offline; other names
+  fall back to an online lookup (CDS Sesame).
+- **Low-light mode**: a dim, red-only interface that keeps your eyes dark-adapted in the field.
+  Every page works in it.
+- **Phones**: every page works on a phone, for checking things beside the camera.
+- **Motion**: answers arrive with short, purposeful animations. When your system asks for reduced
+  motion, they become simple fades or are skipped.
+
+## Running it on your computer
 
 Needs Python 3.10 or newer.
 
@@ -37,45 +71,29 @@ The first start builds the plate-solving index (a few seconds, about 30 MB in
 
 ### Optional
 
-- **Skymap image.** Sky previews are drawn from the built-in star catalog. If you put a
-  `composite_skymap_16k.png` (an all-sky plate carrée image, RA 0h at the centre) in the project
-  folder, or point `SKYMAP_PATH` at one, it is used instead; that is useful for a map with
-  constellation art. The original one is in this
-  [Google Drive folder](https://drive.google.com/drive/folders/1rrDNBE-_NzLOH3oTllvlRFs0W_YL9cPu?usp=sharing).
-- **RAW files.** `pip install rawpy` adds CR2/NEF/ARW/… support to the image loader.
+- **RAW files.** `pip install rawpy` adds CR2/NEF/ARW/… support to the Analyzer.
+- **Skymap image.** Sky previews are drawn from the built-in star catalog, with a modelled Milky
+  Way. If you put a `composite_skymap_16k.png` (an all-sky plate carrée image, RA 0h at the centre)
+  in the project folder, or point `SKYMAP_PATH` at one, it is used instead. The original one is in
+  this [Google Drive folder](https://drive.google.com/drive/folders/1rrDNBE-_NzLOH3oTllvlRFs0W_YL9cPu?usp=sharing).
 - `FLASK_DEBUG=1` runs the server in debug mode (off by default).
 
-## Project layout
+## Putting it online
 
-```
-app/                Flask app (python -m app)
-  routes/           pages, calculator API, analyzer API
-  catalogs/         star and deep-sky catalogs, name search
-  solver/           plate solver: star detection (sep), pattern matching (tetra3rs),
-                    lens-distortion fit (TAN-SIP)
-  annotate.py       labels for a solved photo: stars, deep-sky objects, constellations, grid
-  planner.py        twilight, rise/transit/set, best window, Moon phase and cycle (astropy)
-  skymap.py         sky previews (reprojection to your camera's view)
-  starfield.py      draws real star fields from the catalog
-  imageio.py        loads JPG/PNG/TIFF, FITS and RAW photos
-  templates/        HTML pages
-static/             CSS, JavaScript, camera presets, images
-scripts/            build_catalogs.py, render_masthead.py
-tests/              pytest suite: pip install -r requirements-dev.txt, then pytest
-```
+The `Dockerfile` builds a container that runs anywhere Docker does. It is set up for
+[Google Cloud Run](https://cloud.google.com/run), which scales to zero when nobody is using it, so
+a hobby site usually costs nothing. Step-by-step instructions are in
+[docs/DEPLOY_CLOUD_RUN.md](docs/DEPLOY_CLOUD_RUN.md).
 
-## Catalog data
+The container sets these for public hosting (all optional when running locally):
 
-Star data comes from the [HYG Database](https://github.com/astronexus/HYG-Database) by David Nash,
-and deep-sky data from [OpenNGC](https://github.com/mattiaverga/OpenNGC) by Mattia Verga, both
-CC BY-SA 4.0. Constellation figures are from [d3-celestial](https://github.com/ofrohn/d3-celestial)
-by Olaf Frohn (BSD 3-Clause). See `app/catalogs/data/ATTRIBUTION.md`. To rebuild the trimmed copies, download the
-originals into `catalog_raw/hyg/` and `catalog_raw/openngc/`, then run
-`python scripts/build_catalogs.py`.
-
-Plate solving uses [tetra3rs](https://github.com/ssmichael1/tetra3rs) (MIT) and its bundled star
-catalog from ESA's Gaia DR3 mission, with Hipparcos for the brightest stars. Star detection uses
-[sep](https://github.com/kbarbary/sep), the library version of Source Extractor.
+| Variable | Effect |
+| --- | --- |
+| `HOSTED=1` | Privacy wording for a public site; uploads are processed in memory and discarded. |
+| `SYNC_JOBS=1` | Solve photos inside the upload request (Cloud Run only gives CPU during requests). |
+| `WARMUP_SYNC=1` | Load catalogs, solver index and sky map before serving. |
+| `MAX_UPLOAD_MB` | Largest upload accepted (default 300; Cloud Run caps requests at 32 MiB). |
+| `ANALYZE_PER_10_MIN` | Photo analyses allowed per visitor per 10 minutes (0 = no limit). |
 
 ## Plate solver: what to expect
 
@@ -84,7 +102,44 @@ catalog from ESA's Gaia DR3 mission, with Hipparcos for the brightest stars. Sta
   (over 1 GB), so they aren't supported yet.
 - **Accuracy:** sub-pixel on clean frames, and 1–3 px on typical processed photos. Very wide or
   strongly distorted lenses are looser (about 10 px on a 6000 px, 68° frame), which still puts
-  labels in the right place.
+  labels in the right place. The lens-distortion fit steps down to a simpler model when a
+  higher-order one would warp the edges.
 - If you enter your camera and focal length, the solver tries that field of view first.
+
+## Project layout
+
+```
+app/                Flask app (python -m app)
+  routes/           pages, calculator and planner API, analyzer API
+  catalogs/         star and deep-sky catalogs, name search
+  solver/           plate solver: star detection (sep), pattern matching (tetra3rs),
+                    lens-distortion fit (TAN-SIP)
+  annotate.py       labels for a solved photo, and the sky/foreground mask
+  planner.py        twilight, rise/transit/set, moonless windows, Moon phase and cycle (astropy)
+  skychart.py       data for the all-sky chart: stars, figures, Milky Way, planets, Moon
+  skymap.py         sky previews (reprojection to your camera's view)
+  starfield.py      draws real star fields and the Milky Way from the catalog
+  imageio.py        loads JPG/PNG/TIFF, FITS and RAW photos
+  ratelimit.py      per-visitor limit for hosted analyses
+  templates/        HTML pages
+static/             CSS, JavaScript (one file per page, plus skychart.js), camera presets
+scripts/            build_catalogs.py, render_masthead.py, prebuild.py (used by the Dockerfile)
+docs/               deployment guide, README images
+tests/              pytest suite: pip install -r requirements-dev.txt, then pytest
+PRODUCT.md          who the toolkit is for and the principles behind its design
+```
+
+## Catalog data
+
+Star data comes from the [HYG Database](https://github.com/astronexus/HYG-Database) by David Nash,
+and deep-sky data from [OpenNGC](https://github.com/mattiaverga/OpenNGC) by Mattia Verga, both
+CC BY-SA 4.0. Constellation figures are from [d3-celestial](https://github.com/ofrohn/d3-celestial)
+by Olaf Frohn (BSD 3-Clause). See `app/catalogs/data/ATTRIBUTION.md`. To rebuild the trimmed copies,
+download the originals into `catalog_raw/hyg/` and `catalog_raw/openngc/`, then run
+`python scripts/build_catalogs.py`.
+
+Plate solving uses [tetra3rs](https://github.com/ssmichael1/tetra3rs) (MIT) and its bundled star
+catalog from ESA's Gaia DR3 mission, with Hipparcos for the brightest stars. Star detection uses
+[sep](https://github.com/kbarbary/sep), the library version of Source Extractor.
 
 Made by Atharv Gogia & Kunal Krishna.

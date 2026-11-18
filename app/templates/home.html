@@ -1,25 +1,26 @@
 {% extends "base.html" %}
-{% block title %}Home{% endblock %}
-{% block heading %}Plan the night, frame the shot, read the sky{% endblock %}
-{% block lede %}A small set of tools for photographing the night sky. Everything runs on your own computer,
-using real star catalogs.{% endblock %}
+{% block title %}Tonight{% endblock %}
+{% block heading %}Tonight{% endblock %}
+{% block lede %}<span id="homeWhere">Real star catalogs, worked out for where you are{% if not hosted %}, on your own computer{% endif %}.</span>{% endblock %}
 {% block content %}
 <section class="tonight" aria-live="polite">
     <div id="tonightNoLocation" class="tonight-empty" hidden>
-        <p class="kicker">Tonight</p>
-        <p>Set where you're observing from to see when it gets dark, what the Moon is doing,
-        and which objects are best placed tonight.</p>
+        <h2 class="tonight-ask">Where are you observing from?</h2>
+        <p>Set your location to see when it gets properly dark tonight, when the Moon is out of the way,
+        and which objects are best placed. It stays in this browser.</p>
         <button type="button" class="primary" id="setLocationHome">Set location</button>
     </div>
 
     <div id="tonightBody" hidden>
         <div class="tonight-grid">
             <div>
-                <p class="kicker" id="tonightTitle">Tonight</p>
-                <div class="readout readout-window">
-                    <span class="readout-value" id="darkWindow"></span>
+                <div class="answer-panel">
+                    <p class="readout-label" id="darkLabel">Dark</p>
+                    <div class="readout readout-window">
+                        <span class="readout-value" id="darkWindow"></span>
+                    </div>
+                    <p class="readout-note" id="darkNote"></p>
                 </div>
-                <p class="readout-note" id="darkNote"></p>
                 <table class="event-table" id="tonightTable"><tbody></tbody></table>
                 <div class="moon-box home-moon">
                     <div class="moon-glyph" id="homeMoonGlyph"></div>
@@ -30,38 +31,17 @@ using real star catalogs.{% endblock %}
                 </div>
             </div>
             <div>
-                <p class="kicker">Well placed tonight</p>
+                <h2 class="tonight-head">Best targets tonight</h2>
                 <table class="object-table highlight-table">
-                    <thead><tr><th>Object</th><th>Best around</th><th>Altitude</th></tr></thead>
+                    <thead><tr><th>Object</th><th>Highest</th><th>Altitude</th></tr></thead>
                     <tbody id="highlightRows"></tbody>
                 </table>
-                <p class="note">Bright, well-known objects that get highest while it's dark. Pick one to plan it.</p>
+                <p class="note">Bright, well-known objects that climb highest while it's dark. Pick one to plan it:
+                rise and set times, the sky chart, exposure and framing.</p>
             </div>
         </div>
     </div>
     <p class="error" id="tonightError" role="alert"></p>
-</section>
-
-<section class="tools">
-    <h2 class="section-head">Tools</h2>
-    <ol class="tool-list">
-        <li>
-            <a href="{{ url_for('pages.planner') }}">Night planner</a>
-            <p>When a target rises, peaks and sets, which way to look, the best dark window, and the Moon's phase for the month ahead.</p>
-        </li>
-        <li>
-            <a href="{{ url_for('pages.exposure') }}">Exposure calculator</a>
-            <p>The longest shutter time before stars trail, across your whole sensor, from the NPF rule.</p>
-        </li>
-        <li>
-            <a href="{{ url_for('pages.framing') }}">Framing</a>
-            <p>Your camera's frame on the real sky around a target, to choose a lens and composition before you go out.</p>
-        </li>
-        <li>
-            <a href="{{ url_for('pages.analyzer') }}">Image analyzer</a>
-            <p>Open a photo to find exactly where it points, with constellations, stars and nebulae labelled on it.</p>
-        </li>
-    </ol>
 </section>
 {% endblock %}
 {% block scripts %}

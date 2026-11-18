@@ -2,14 +2,14 @@
 {% block title %}Analyzer{% endblock %}
 {% block heading %}Image analyzer{% endblock %}
 {% block lede %}Find out exactly where a night-sky photo points and what is in it: constellations,
-named stars, nebulae, clusters and galaxies. Everything runs on your computer; nothing is uploaded anywhere.{% endblock %}
+named stars, nebulae, clusters and galaxies. {% if hosted %}Your photo is solved on this site's server and is not kept afterwards.{% else %}Everything runs on your computer; nothing is uploaded anywhere.{% endif %}{% endblock %}
 {% block content %}
-<form id="analyzeForm" class="upload-form" novalidate>
+<form id="analyzeForm" class="upload-form" novalidate data-max-upload-mb="{{ max_upload_mb }}">
     <div class="field">
         <label for="imageUpload">Photo</label>
         <input type="file" id="imageUpload"
                accept=".jpg,.jpeg,.png,.tif,.tiff,.fit,.fits,.fts,.cr2,.cr3,.nef,.arw,.raf,.orf,.rw2,.dng,.pef">
-        <p class="note">JPG, PNG, TIFF or FITS. Camera RAW files need the optional <code>rawpy</code> package.</p>
+        <p class="note">JPG, PNG, TIFF or FITS{% if hosted %}. For camera RAW files, export a JPG or TIFF first{% else %}. Camera RAW files (CR2, NEF, ARW…) work once the optional rawpy package is installed{% endif %}.</p>
     </div>
     <details class="hint-box">
         <summary>Lens details (optional, speeds things up)</summary>
@@ -45,6 +45,8 @@ named stars, nebulae, clusters and galaxies. Everything runs on your computer; n
         <button type="button" class="layer" data-layer="stars" aria-pressed="true">Stars</button>
         <button type="button" class="layer" data-layer="dsos" aria-pressed="true">Deep sky</button>
         <button type="button" class="layer" data-layer="grid" aria-pressed="false">RA/Dec grid</button>
+        <button type="button" class="layer-fg" id="fgToggle" aria-pressed="false" hidden
+                title="Also show lines and labels over the landscape, where the photo shows no stars">Over foreground</button>
     </div>
     <figure class="viewfinder-figure">
         <div class="viewfinder photo" id="photoFrame">

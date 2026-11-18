@@ -31,3 +31,6 @@ catalog_raw/
 
 # Plate-solving index, built on first use
 app/solver/cache/
+
+# Output of scripts/prebuild.py when run locally
+data/

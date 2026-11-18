@@ -21,7 +21,8 @@ Frédéric Michaud's NPF rule from your aperture, focal length, pixel size and t
             changes across the sensor, drawn over the sky your camera will see.</p>
         </div>
 
-        <div id="resultsBody" hidden>
+        <div id="resultsBody" class="result-layout" hidden>
+          <div class="result-side answer-panel">
             <p class="kicker">Longest exposure &middot; <span id="targetLabel"></span></p>
             <div class="readout">
                 <span class="readout-value" id="resWhole"></span>
@@ -29,27 +30,30 @@ Frédéric Michaud's NPF rule from your aperture, focal length, pixel size and t
             </div>
             <p class="readout-note">for sharp stars across the whole frame</p>
 
-            <dl class="stats">
+            <dl class="stats stack">
                 <div><dt>Frame centre</dt><dd id="resCentre"></dd></div>
                 <div><dt>Simplified NPF</dt><dd id="resSimple"></dd></div>
                 <div><dt>500 rule</dt><dd id="res500"></dd></div>
-                <div><dt>Field of view</dt><dd id="resFov"></dd></div>
                 <div><dt>Declination</dt><dd id="resDec"></dd></div>
+                <div class="wide"><dt>Field of view</dt><dd id="resFov"></dd></div>
             </dl>
+          </div>
 
             <figure class="viewfinder-figure">
                 <div class="viewfinder" id="sensor">
-                    <img id="skyImage" alt="Sky behind the sensor" hidden>
-                    <svg class="sky-lines" id="skyLines" preserveAspectRatio="none" aria-hidden="true"></svg>
+                    <div class="clip">
+                        <img id="skyImage" alt="Sky behind the sensor" hidden>
+                        <svg class="sky-lines" id="skyLines" preserveAspectRatio="none" aria-hidden="true"></svg>
+                    </div>
                     <div class="sensor-grid" id="sensorGrid"></div>
                     <span class="corner tl"></span><span class="corner tr"></span>
                     <span class="corner bl"></span><span class="corner br"></span>
                     <p class="sensor-status" id="skyStatus"></p>
                 </div>
                 <figcaption>
-                    Each ninth of the frame, with its longest exposure and the declination at its centre.
-                    The marked cell sits closest to the celestial equator, so it sets the limit for the whole frame.
-                    The simplified NPF assumes a declination of about 60°; the 500 rule is shown for comparison only.
+                    Longest exposure for each ninth of the frame, with the declination at its centre. The marked
+                    cell is closest to the celestial equator, so it sets the limit. The simplified NPF assumes
+                    a declination of about 60°; the 500 rule is for comparison only.
                 </figcaption>
             </figure>
         </div>

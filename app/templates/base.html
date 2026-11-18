@@ -2,19 +2,20 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#100e0b">
     <title>{% block title %}{% endblock %} · Astrophotography Toolkit</title>
     <script>
         // Apply low-light mode before first paint so the page never flashes bright.
-        try { if (localStorage.getItem('astro-low-light') === '1') document.documentElement.dataset.mode = 'lowlight'; } catch (e) {}
+        try { if (localStorage.getItem('astro-low-light') === '1') { document.documentElement.dataset.mode = 'lowlight'; document.querySelector('meta[name=theme-color]').content = '#0a0000'; } } catch (e) {}
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,400&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
     <link rel="stylesheet" href="{{ asset('css/site.css') }}">
 </head>
 <body>
-<header class="masthead">
+<header class="masthead {% block masthead_class %}compact{% endblock %}">
     <div class="wrap">
         <div class="masthead-top">
             <a class="site-title" href="{{ url_for('pages.index') }}">Astrophotography Toolkit</a>
@@ -50,13 +51,20 @@
             (<a href="https://www.linkedin.com/in/kunal-krishna-927362325/" target="_blank" rel="noopener">LinkedIn</a>,
             <a href="https://github.com/kunal12krishna" target="_blank" rel="noopener">GitHub</a>).
         </p>
+        <p class="credits">
+            Star data: <a href="https://github.com/astronexus/HYG-Database" target="_blank" rel="noopener">HYG Database</a>
+            (David Nash) and <a href="https://github.com/mattiaverga/OpenNGC" target="_blank" rel="noopener">OpenNGC</a>
+            (Mattia Verga), both <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a>.
+            Constellation figures: <a href="https://github.com/ofrohn/d3-celestial" target="_blank" rel="noopener">d3-celestial</a>
+            (Olaf Frohn, BSD 3-Clause). Plate solving: <a href="https://github.com/ssmichael1/tetra3rs" target="_blank" rel="noopener">tetra3rs</a>
+            (MIT) with ESA Gaia DR3 and Hipparcos data.
+        </p>
     </div>
 </footer>
 <dialog class="location-dialog" id="locationDialog" aria-labelledby="locationTitle">
     <form method="dialog" id="locationForm" novalidate>
         <h2 id="locationTitle">Observing location</h2>
-        <p class="muted">Used to work out when things rise and set and how high they get. It stays in this
-        browser and is never sent anywhere except this app on your computer.</p>
+        <p class="muted">Used to work out when things rise and set and how high they get. It is saved in this browser{% if hosted %} and only sent to this site to do those calculations{% else %} and only sent to this app on your computer{% endif %}.</p>
         <button type="button" class="secondary" id="locateMe">Use my current location</button>
         <p class="note" id="locateStatus" role="status"></p>
         <p class="or">or enter it</p>

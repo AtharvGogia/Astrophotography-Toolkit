@@ -52,6 +52,29 @@ class Solution:
         }
 
 
+# Allowed range of the fitted pixel scale relative to the plain gnomonic projection, anywhere
+# in the frame. Real camera lenses stay well inside this.
+MIN_WARP, MAX_WARP = 0.8, 1.2
+
+
+def _warp(wcs, width, height):
+    """Smallest and largest local pixel scale of a TAN-SIP fit relative to its plain TAN part."""
+    if wcs.sip is None:
+        return 1.0, 1.0
+    gx, gy = np.meshgrid(np.linspace(0, width, 25), np.linspace(0, height, 15))
+    gx, gy = gx.ravel(), gy.ravel()
+    tan = wcs.deepcopy()
+    tan.sip = None
+    ratios = []
+    for dx, dy in ((1, 0), (0, 1)):
+        fit = wcs.pixel_to_world(gx, gy).separation(wcs.pixel_to_world(gx + dx, gy + dy)).deg
+        plain = tan.pixel_to_world(gx, gy).separation(tan.pixel_to_world(gx + dx, gy + dy)).deg
+        ratios.append(fit / plain)
+    r = np.concatenate(ratios)
+    r = r[np.isfinite(r)]
+    return (float(r.min()), float(r.max())) if len(r) else (0.0, np.inf)
+
+
 def _measure(wcs, width, height):
     cx, cy = width / 2, height / 2
     c = wcs.pixel_to_world(cx, cy)
@@ -109,8 +132,16 @@ def solve(mono, fov_hint=None, progress=None, timeout_s=30):
     report(0.7, 'Pattern matched. Fitting lens distortion…')
     base = _refine.initial_wcs(result, w, h)
     # Very wide lenses distort more than a cubic can follow at the corners.
-    degree = 4 if result.fov_deg > 45 else 3
-    wcs, info = _refine.refine(base, stars, db, w, h, sip_degree=degree)
+    # A fit that bends the pixel scale far more than any real lens is chasing too few stars
+    # (often because foreground covers part of the frame); step down to a gentler polynomial.
+    first = 4 if result.fov_deg > 45 else 3
+    for degree in range(first, 1, -1):
+        wcs, info = _refine.refine(base, stars, db, w, h, sip_degree=degree)
+        lo, hi = _warp(wcs, w, h)
+        if info['rms_arcsec'] is None or (lo >= MIN_WARP and hi <= MAX_WARP):
+            break
+    else:
+        wcs, info = base, {'matched': None, 'rms_arcsec': None, 'matches': []}
     rms = info['rms_arcsec']
     if rms is None or not math.isfinite(rms) or rms > max(float(result.rmse_arcsec), 1.0) * 1.5:
         # Refinement made things worse (sparse or odd image): keep the pinhole solution.

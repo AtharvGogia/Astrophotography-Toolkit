@@ -4,7 +4,7 @@ import math
 from astropy.time import Time
 from flask import Blueprint, jsonify, request
 
-from .. import planner
+from .. import planner, skychart
 from ..coords import get_target_coords
 
 bp = Blueprint('planner', __name__, url_prefix='/api')
@@ -45,7 +45,9 @@ def plan():
         coords = get_target_coords(data)
     except Exception as exc:
         return jsonify({'error': f'Could not find the target. {exc}'}), 404
-    return jsonify(planner.plan(lat, lon, start, coords.ra.deg, coords.dec.deg, min_alt))
+    result = planner.plan(lat, lon, start, coords.ra.deg, coords.dec.deg, min_alt)
+    result['target'] = {'ra': round(float(coords.ra.deg), 4), 'dec': round(float(coords.dec.deg), 4)}
+    return jsonify(result)
 
 
 @bp.post('/tonight')
@@ -69,3 +71,17 @@ def moon():
     except (ValueError, TypeError) as exc:
         return jsonify({'error': str(exc)}), 400
     return jsonify(planner.moon_cycle(start, days))
+
+
+@bp.get('/skychart')
+def sky_chart():
+    """Everything the all-sky chart needs for one night at one place."""
+    try:
+        lat = _num(request.args, 'lat', -90, 90)
+        lon = _num(request.args, 'lon', -180, 180)
+        start = _start(request.args.get('start'))
+    except (ValueError, TypeError) as exc:
+        return jsonify({'error': str(exc)}), 400
+    resp = jsonify(skychart.sky_chart(round(lat, 2), round(lon, 2), start))
+    resp.headers['Cache-Control'] = 'private, max-age=3600'
+    return resp

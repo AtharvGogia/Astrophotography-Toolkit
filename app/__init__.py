@@ -1,7 +1,7 @@
 """Astrophotography Toolkit web app."""
 import threading
 
-from flask import Flask
+from flask import Flask, jsonify, request
 
 from . import catalogs, settings, skymap
 
@@ -16,12 +16,31 @@ def create_app(load_skymap=True):
     app.register_blueprint(analyzer.bp)
     app.register_blueprint(planner.bp)
 
-    if load_skymap:
-        skymap.load()
-    # Warm up in the background so the first search / first analysis doesn't wait:
-    # the target search index, and the plate-solving index (built once, then loaded from disk).
-    threading.Thread(target=catalogs.targets, daemon=True).start()
-    if load_skymap:
-        from .solver import index
-        threading.Thread(target=index.get, daemon=True).start()
+    @app.errorhandler(413)
+    def too_large(_):
+        msg = f'That file is larger than this site accepts ({settings.MAX_UPLOAD_MB} MB). Try a JPG or a smaller export.'
+        if request.path.startswith('/api/'):
+            return jsonify({'error': msg}), 413
+        return msg, 413
+
+    @app.get('/healthz')
+    def healthz():
+        return {'ok': True, 'skymap': skymap.is_loaded()}
+
+    # Warm-up: the target search index, the sky map and the plate-solving index.
+    # Locally this happens in background threads so the server starts at once. On hosts that only
+    # give CPU during requests (Cloud Run), WARMUP_SYNC does it before serving instead.
+    if settings.WARMUP_SYNC:
+        catalogs.targets()
+        if load_skymap:
+            skymap.load(background=False)
+            from .solver import index
+            index.get()
+    else:
+        if load_skymap:
+            skymap.load()
+        threading.Thread(target=catalogs.targets, daemon=True).start()
+        if load_skymap:
+            from .solver import index
+            threading.Thread(target=index.get, daemon=True).start()
     return app

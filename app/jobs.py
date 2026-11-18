@@ -10,6 +10,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 _executor = ThreadPoolExecutor(max_workers=2)
+_sync_slots = threading.BoundedSemaphore(2)
 _jobs = {}
 _lock = threading.Lock()
 _MAX_AGE_S = 3600
@@ -37,8 +38,13 @@ class Job:
                 'message': self.message, 'result': self.result, 'error': self.error}
 
 
-def submit(fn, *args, **kwargs):
-    """Run fn(job, *args, **kwargs) in the background. Returns the Job."""
+def submit(fn, *args, sync=False, **kwargs):
+    """Run fn(job, *args, **kwargs) in the background, or right now if sync=True. Returns the Job.
+
+    sync=True is for hosts that only give the process CPU while a request is open (Cloud Run):
+    the job finishes before the response is sent, and the browser's first poll sees the result.
+    At most two run at once either way, to bound memory use.
+    """
     job = Job()
     with _lock:
         _prune()
@@ -55,13 +61,23 @@ def submit(fn, *args, **kwargs):
                 traceback.print_exc()
             job.state, job.error, job.message = 'failed', str(exc) or type(exc).__name__, 'Failed'
 
-    _executor.submit(run)
+    if sync:
+        with _sync_slots:
+            run()
+    else:
+        _executor.submit(run)
     return job
 
 
 def get(job_id):
     with _lock:
         return _jobs.get(job_id)
+
+
+def discard(job_id):
+    """Forget a job and everything it holds (result, preview image)."""
+    with _lock:
+        _jobs.pop(job_id, None)
 
 
 def _prune():

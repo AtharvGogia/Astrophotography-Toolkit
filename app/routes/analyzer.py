@@ -1,16 +1,18 @@
-"""Image analyzer API: plate-solve an uploaded photo on this computer and label what is in it.
+"""Image analyzer API: plate-solve an uploaded photo and label what is in it.
 
-POST /api/analyze            multipart: image (file), optional fov_hint (degrees) -> {job_id}
+POST /api/analyze            multipart: image (file), optional fov_hint (degrees)
+                             -> {job_id}, plus {job} with the finished result when SYNC_JOBS is on
 GET  /api/jobs/<id>          state, progress, message, result
 GET  /api/jobs/<id>/preview  JPEG preview of the uploaded photo
 """
+import base64
 import io
 import math
 
 from flask import Blueprint, Response, jsonify, request
 from PIL import Image
 
-from .. import annotate, imageio, jobs, solver
+from .. import annotate, imageio, jobs, ratelimit, settings, solver
 
 bp = Blueprint('analyzer', __name__, url_prefix='/api')
 
@@ -24,13 +26,19 @@ def _run(job, data, filename, fov_hint):
 
     solution = solver.solve(img.mono, fov_hint=fov_hint, progress=job.update)
     job.update(0.9, 'Labelling stars and objects…')
-    labels = annotate.annotate(solution)
-    return {'solution': solution.to_dict(), 'annotations': labels,
-            'preview': f'/api/jobs/{job.id}/preview', 'filename': filename}
+    labels = annotate.annotate(solution, img.mono)
+    if settings.SYNC_JOBS:
+        # Stateless hosting: send the preview inline so no second request has to reach this instance.
+        preview = 'data:image/jpeg;base64,' + base64.b64encode(job.files['preview'][0]).decode('ascii')
+    else:
+        preview = f'/api/jobs/{job.id}/preview'
+    return {'solution': solution.to_dict(), 'annotations': labels, 'preview': preview, 'filename': filename}
 
 
 @bp.post('/analyze')
 def analyze():
+    if not ratelimit.allow(('analyze', ratelimit.client_ip()), settings.ANALYZE_PER_10_MIN):
+        return jsonify({'error': 'Too many photos in a short time. Please wait a few minutes and try again.'}), 429
     file = request.files.get('image')
     if file is None or not file.filename:
         return jsonify({'error': 'No photo in the request.'}), 400
@@ -47,7 +55,11 @@ def analyze():
         if not math.isfinite(fov_hint) or not 0.1 <= fov_hint <= 180:
             return jsonify({'error': 'fov_hint must be between 0.1 and 180 degrees.'}), 400
     data = file.read()
-    job = jobs.submit(_run, data, file.filename, fov_hint)
+    job = jobs.submit(_run, data, file.filename, fov_hint, sync=settings.SYNC_JOBS)
+    if settings.SYNC_JOBS:
+        body = {'job_id': job.id, 'job': job.to_dict()}
+        jobs.discard(job.id)          # nothing about the photo is kept once the answer is sent
+        return jsonify(body), 200
     return jsonify({'job_id': job.id}), 202
 
 

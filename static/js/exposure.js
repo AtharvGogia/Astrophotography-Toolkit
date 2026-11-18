@@ -15,6 +15,7 @@
     $('targetName').addEventListener('target-picked', (e) => {
         try { localStorage.setItem('astro-target', JSON.stringify(e.detail)); } catch (err) { /* ignore */ }
     });
+    Astro.linkTargetInputs($('targetName'), $('customRA'), $('customDec'), $('coordsBox'));
     Astro.loadCameraPresets($('cameraPreset'), (cam) => {
         $('sensorWidth').value = cam.widthPx;
         $('sensorHeight').value = cam.heightPx;
@@ -90,16 +91,21 @@
         $('sensorGrid').innerHTML = cellsHtml;
         $('sensorGrid').children[minIdx].classList.add('limit');
 
-        $('targetLabel').textContent = haveCoords ? `RA ${ra}°, Dec ${dec}°` : name;
-        $('resWhole').textContent = minT.toFixed(1);
+        $('targetLabel').textContent = Astro.targetLabel(picked, name, ra, dec, haveCoords);
+        Astro.motion.countTo($('resWhole'), minT, (v) => v.toFixed(1));
+        // The nine cells arrive from the centre outward.
+        Astro.motion.stagger($('sensorGrid').children, { ms: 360,
+            delay: (n, i) => Math.hypot(Math.floor(i / 3) - 1, (i % 3) - 1) * 90 });
         $('resCentre').textContent = fmtS(Astro.npfTime(N, F, p, centerDec));
         $('resSimple').textContent = fmtS(Astro.npfSimple(N, F, p));
         $('res500').textContent = fmtS(Astro.rule500(F, Math.hypot(wMm, hMm)));
         $('resFov').textContent = `${Astro.fovDeg(wMm, F).toFixed(1)}° × ${Astro.fovDeg(hMm, F).toFixed(1)}°`;
         $('resDec').textContent = fmtDeg(centerDec, 2);
         $('sensor').style.aspectRatio = `${wPx} / ${hPx}`;
+        $('sensor').style.setProperty('--ar', wPx / hPx);
         $('resultsEmpty').hidden = true;
         $('resultsBody').hidden = false;
+        Astro.revealOnPhone($('results'), $('exposureForm'));
 
         // ---- Sky preview (slow, loads in the background) -----------------------
         const img = $('skyImage');
@@ -107,6 +113,8 @@
         $('skyStatus').textContent = 'Rendering the sky behind your sensor…';
         const skyPayload = { ...target, focal_length: F, sensor_width_px: wPx, sensor_height_px: hPx,
                              pixel_pitch: p, rotation_deg: rotation };
+        $('skyLines').style.visibility = 'hidden';     // shown once the sky has rendered
+        $('skyStatus').classList.remove('is-error');
         Astro.loadSkyLines($('skyLines'), skyPayload);
         try {
             const resp = await Astro.postJSON('/api/skymap', skyPayload);
@@ -118,8 +126,12 @@
             skyUrl = URL.createObjectURL(await resp.blob());
             img.src = skyUrl;
             img.hidden = false;
+            $('skyLines').style.visibility = '';
             $('skyStatus').textContent = '';
+            Astro.motion.settleSky([img, $('skyLines')]);
         } catch (err) {
+            $('skyLines').style.visibility = '';
+            $('skyStatus').classList.add('is-error');
             $('skyStatus').textContent = err.message;
         }
     });

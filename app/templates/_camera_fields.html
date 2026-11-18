@@ -2,44 +2,40 @@
     <legend>Camera and lens</legend>
     <div class="field">
         <label for="cameraPreset">Camera</label>
-        <select id="cameraPreset">
+        <select id="cameraPreset" title="Fills in sensor size and pixel pitch; check them against your spec sheet.">
             <option value="">Custom (enter sensor details below)</option>
         </select>
-        <p class="note">Presets fill in sensor size and pixel pitch. Double-check them against your camera's spec sheet.</p>
     </div>
     <div class="field-row">
         <div class="field">
-            <label for="focalLength">Focal length (mm)</label>
+            <label for="focalLength" title="Focal length in millimetres">Focal (mm)</label>
             <input type="number" id="focalLength" placeholder="24" step="any" min="1">
         </div>
         {% if with_aperture %}
         <div class="field">
-            <label for="aperture">Aperture (f-number)</label>
+            <label for="aperture" title="Aperture as an f-number">f-number</label>
             <input type="number" id="aperture" placeholder="1.8" step="0.1" min="0.5">
         </div>
         {% endif %}
-    </div>
-    <div class="field-row">
         <div class="field">
-            <label for="pixelPitch">Pixel pitch (µm)</label>
-            <input type="number" id="pixelPitch" placeholder="5.93" step="0.01" min="0.5">
-        </div>
-        <div class="field">
-            <label for="rotation">Rotation (°)</label>
+            <label for="rotation" title="Angle of the top of the frame from north, towards east. Empty means north up.">Rotation (°)</label>
             <input type="number" id="rotation" placeholder="0" step="any">
         </div>
     </div>
     <div class="field-row">
         <div class="field">
-            <label for="sensorWidth">Sensor width (px)</label>
+            <label for="pixelPitch" title="Pixel pitch in micrometres">Pixel (µm)</label>
+            <input type="number" id="pixelPitch" placeholder="5.93" step="0.01" min="0.5">
+        </div>
+        <div class="field">
+            <label for="sensorWidth" title="Sensor width in pixels">Width (px)</label>
             <input type="number" id="sensorWidth" placeholder="6000" min="1">
         </div>
         <div class="field">
-            <label for="sensorHeight">Sensor height (px)</label>
+            <label for="sensorHeight" title="Sensor height in pixels">Height (px)</label>
             <input type="number" id="sensorHeight" placeholder="4000" min="1">
         </div>
     </div>
-    <p class="note">Rotation is the angle of the top of the frame from north, towards east. Leave it empty for north up.</p>
 </fieldset>
 
 <fieldset>
@@ -52,16 +48,17 @@
         <ul class="combo-list" id="targetList" role="listbox" hidden></ul>
         <p class="target-info" id="targetInfo"></p>
     </div>
-    <p class="or">or enter coordinates</p>
-    <div class="field-row">
-        <div class="field">
-            <label for="customRA">Right ascension (°)</label>
-            <input type="number" id="customRA" step="any" min="0" max="360">
+    <details class="coords" id="coordsBox">
+        <summary>Enter coordinates instead</summary>
+        <div class="field-row">
+            <div class="field">
+                <label for="customRA">Right ascension (°)</label>
+                <input type="number" id="customRA" step="any" min="0" max="360">
+            </div>
+            <div class="field">
+                <label for="customDec">Declination (°)</label>
+                <input type="number" id="customDec" step="any" min="-90" max="90">
+            </div>
         </div>
-        <div class="field">
-            <label for="customDec">Declination (°)</label>
-            <input type="number" id="customDec" step="any" min="-90" max="90">
-        </div>
-    </div>
-    <p class="note">Suggestions come from the built-in HYG star and OpenNGC catalogs. Anything else is looked up online (CDS Sesame).</p>
+    </details>
 </fieldset>

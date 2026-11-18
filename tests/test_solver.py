@@ -138,3 +138,32 @@ def test_constellation_lines_pass_through_their_stars():
 def test_constellation_catalog_is_complete():
     abbrs = {abbr for abbr, _ in catalogs.constellation_lines()}
     assert len(abbrs) == 88
+
+
+def test_overlay_marks_foreground_but_keeps_open_sky():
+    img, _ = synthetic_field(83.8, -5.4, 0)
+    sol = solver.solve(img)
+    h, w = img.shape
+    plain = annotate.annotate(sol, img)
+    # Clear sky: nothing is marked as foreground.
+    assert not plain['foreground']
+    assert not any(line.get('fg') for line in plain['lines'])
+
+    # Cover the lower 40% with a starless "hillside" (rough texture, no stars).
+    ground = img.copy()
+    rng = np.random.default_rng(5)
+    ground[int(h * 0.6):] = rng.normal(0.08, 0.02, (h - int(h * 0.6), w)).astype(np.float32)
+    covered = annotate.annotate(sol, ground)
+    assert covered['foreground']
+    sky_pts = np.array([p for line in covered['lines'] if not line.get('fg') for p in line['points']])
+    fg_pts = np.array([p for line in covered['lines'] if line.get('fg') for p in line['points']])
+    # Open-sky lines stay out of the hillside, and the hillside's lines are kept, marked.
+    assert not ((sky_pts[:, 1] > h * 0.75) & (sky_pts[:, 1] < h)).any()
+    assert len(fg_pts) and (fg_pts[:, 1] > h * 0.55).all()
+    # Nothing is lost: sky and foreground parts together cover the plain drawing.
+    n_plain = sum(len(line['points']) for line in plain['lines'])
+    assert len(sky_pts) + len(fg_pts) >= n_plain
+    top_plain = sum(1 for line in plain['lines'] for x, y in line['points'] if 0 <= y < h * 0.45)
+    assert sum(1 for x, y in sky_pts if 0 <= y < h * 0.45) >= 0.9 * top_plain
+    for s in covered['stars']:
+        assert s.get('fg', False) == (s['y'] > h * 0.75) or h * 0.5 < s['y'] < h * 0.75

@@ -3,6 +3,8 @@ import os
 
 from flask import Blueprint, current_app, render_template, url_for
 
+from .. import settings
+
 bp = Blueprint('pages', __name__)
 
 # (endpoint, label) in nav order. Only tools that work are listed.
@@ -22,7 +24,8 @@ def asset(filename):
 
 @bp.app_context_processor
 def inject_globals():
-    return {'nav_items': NAV, 'asset': asset}
+    return {'nav_items': NAV, 'asset': asset, 'hosted': settings.HOSTED,
+            'max_upload_mb': settings.MAX_UPLOAD_MB}
 
 
 @bp.get('/')

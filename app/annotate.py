@@ -10,6 +10,7 @@ import warnings
 import numpy as np
 from astropy import units as u
 from astropy.coordinates import SkyCoord, get_constellation
+from astropy.wcs.utils import proj_plane_pixel_scales
 
 from . import catalogs
 
@@ -45,12 +46,16 @@ def _project(wcs, ra, dec, width, height, centre, max_sep_deg, margin=0.0):
     return x, y
 
 
-def _polylines(x, y, max_jump):
-    """Split projected points into runs of finite, nearby points (each run becomes one polyline)."""
+def _polylines(x, y, max_jump, ok_step=None):
+    """Split projected points into runs of finite, nearby points (each run becomes one polyline).
+
+    ok_step[i] False means the step from point i-1 to i is not to be trusted: break there.
+    """
     runs, seg = [], []
-    for xi, yi in zip(x, y):
+    for i, (xi, yi) in enumerate(zip(x, y)):
         if np.isfinite(xi) and np.isfinite(yi):
-            if seg and math.hypot(xi - seg[-1][0], yi - seg[-1][1]) > max_jump:
+            if seg and (math.hypot(xi - seg[-1][0], yi - seg[-1][1]) > max_jump
+                        or (ok_step is not None and not ok_step[i])):
                 if len(seg) > 1:
                     runs.append(seg)
                 seg = []
@@ -62,6 +67,27 @@ def _polylines(x, y, max_jump):
     if len(seg) > 1:
         runs.append(seg)
     return runs
+
+
+def _steps_ok(ras, decs, x, y, deg_per_px, stretch=2.0):
+    """Whether each step along a projected line has a believable length in pixels.
+
+    Consecutive points are a known angle apart on the sky. A real lens (plus the gnomonic
+    projection, which stretches up to about 1.5x at the corners of a 70° frame) maps that to
+    roughly angle / pixel scale. A distortion polynomial pushed outside the stars it was fitted
+    to can stretch or fold far beyond that; such steps would be drawn as long straight chords
+    across the photo, so lines break there instead.
+    """
+    ra, dec = np.radians(ras), np.radians(decs)
+    cos_d = (np.sin(dec[1:]) * np.sin(dec[:-1])
+             + np.cos(dec[1:]) * np.cos(dec[:-1]) * np.cos(ra[1:] - ra[:-1]))
+    expect = np.degrees(np.arccos(np.clip(cos_d, -1, 1))) / deg_per_px
+    got = np.hypot(np.diff(x), np.diff(y))
+    with np.errstate(invalid='ignore', divide='ignore'):
+        ratio = got / expect
+    good = ~((ratio > stretch) | (ratio < 1 / (2 * stretch)))
+    good |= expect < 1.0                      # coincident points: nothing to judge
+    return np.concatenate([[True], good])
 
 
 def _great_circle(ra1, dec1, ra2, dec2, n):
@@ -81,11 +107,94 @@ def _great_circle(ra1, dec1, ra2, dec2, n):
     return ra, dec
 
 
-def constellation_lines(wcs, width, height, centre=None, half_diag=None):
-    """Constellation stick figures projected into the image: [{'con': 'Ori', 'points': [[x, y], ...]}]."""
+_star_arrays = None
+
+
+def _catalog_star_arrays():
+    global _star_arrays
+    if _star_arrays is None:
+        rows = catalogs.load_stars()
+        _star_arrays = (np.array([r['ra'] for r in rows]), np.array([r['dec'] for r in rows]),
+                        np.array([r['mag'] for r in rows]))
+    return _star_arrays
+
+
+def sky_support(solution, mono, n_stars=150, k_nearest=6, min_found_share=0.5, snr=8.0):
+    """Where in the photo there is open sky, as a function (x, y) -> bool array, or None.
+
+    Foreground (mountains, trees, buildings) hides the stars behind it, so constellation lines
+    and labels drawn across it are meaningless. For the brightest catalog stars in the frame,
+    this looks at the photo itself: is there a clear point of light where the star should be?
+    In open sky nearly all of them show; behind the foreground almost none do. A point counts
+    as sky when most of the k_nearest bright catalog stars around it were seen.
+
+    Returns None (nothing is hidden) when there is no image or too few bright stars to judge.
+    """
+    if mono is None:
+        return None
+    w, h, wcs = solution.width, solution.height, solution.wcs
+    ra, dec, mag = _catalog_star_arrays()
+    centre, half_diag = _frame(wcs, w, h)
+    cx, cy = _project(wcs, ra, dec, w, h, centre, half_diag * 1.05)
+    on = np.flatnonzero(np.isfinite(cx))
+    if len(on) < 10:
+        return None
+    on = on[np.argsort(mag[on])][:n_stars]
+    sx, sy = cx[on], cy[on]
+
+    # Work on a binned copy about 1500 px across; that is plenty to see bright stars.
+    img = np.asarray(mono, dtype=np.float32)
+    k = max(1, int(np.ceil(max(img.shape) / 1500)))
+    H, W = img.shape[0] // k * k, img.shape[1] // k * k
+    small = img[:H, :W].reshape(H // k, k, W // k, k).mean(axis=(1, 3))
+    fx, fy = img.shape[1] / w, img.shape[0] / h          # solution pixels -> image pixels
+    r = max(2, int(math.ceil(0.006 * max(w, h) * fx / k)))  # allows for the fit's error
+    R = 4 * r
+    seen = np.zeros(len(on), dtype=bool)
+    for i, (x, y) in enumerate(zip(sx * fx / k, sy * fy / k)):
+        xi, yi = int(x), int(y)
+        win = small[max(0, yi - R):yi + R + 1, max(0, xi - R):xi + R + 1]
+        core = small[max(0, yi - r):yi + r + 1, max(0, xi - r):xi + r + 1]
+        if win.size < 9 or core.size == 0:
+            continue
+        med = float(np.median(win))
+        noise = float(np.median(np.abs(win - med))) * 1.4826 + 1e-6
+        peak = float(core.max())
+        # A clear point of light; or, in busy star fields like the Milky Way core where the
+        # noise estimate is high, a fainter one that is still the brightest thing around.
+        level = (peak - med) / noise
+        seen[i] = level > snr or (level > snr / 2 and peak >= float(win.max()))
+
+    from scipy.spatial import cKDTree
+    tree = cKDTree(np.column_stack([sx, sy]))
+    kq = min(k_nearest, len(on))
+    inset = 0.02 * max(w, h)
+
+    def visible(x, y):
+        x, y = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
+        out = np.zeros(x.shape, dtype=bool)
+        ok = np.isfinite(x) & np.isfinite(y)
+        if ok.any():
+            # Points beyond the border are judged by the sky just inside it.
+            q = np.column_stack([np.clip(x[ok], inset, w - inset), np.clip(y[ok], inset, h - inset)])
+            _, idx = tree.query(q, k=kq)
+            idx = idx.reshape(len(q), -1)
+            out[ok] = seen[idx].mean(axis=1) >= min_found_share
+        return out
+    visible.stars = (sx, sy, seen)
+    return visible
+
+
+def constellation_lines(wcs, width, height, centre=None, half_diag=None, visible=None):
+    """Constellation stick figures projected into the image: [{'con': 'Ori', 'points': [[x, y], ...]}].
+
+    visible (from sky_support) splits lines where the photo shows no stars, e.g. over the
+    foreground; those parts are returned with 'fg': True so the page can hide them.
+    """
     if centre is None:
         centre, half_diag = _frame(wcs, width, height)
     reach = half_diag * 1.6
+    deg_per_px = float(np.mean(proj_plane_pixel_scales(wcs.celestial)))
     out = []
     # Angular distance of every figure vertex from the frame centre, in one vectorised pass.
     c_ra, c_dec = math.radians(centre.ra.deg), math.radians(centre.dec.deg)
@@ -117,9 +226,28 @@ def constellation_lines(wcs, width, height, centre=None, half_diag=None):
             y = np.full(len(ras), np.nan)
             if ok.any():
                 x[ok], y[ok] = _project(wcs, ras[ok], decs[ok], width, height, centre, reach, margin=0.15)
-            for pts in _polylines(x, y, 0.3 * max(width, height)):
-                out.append({'con': abbr, 'points': pts})
+            for pts in _polylines(x, y, 0.3 * max(width, height), _steps_ok(ras, decs, x, y, deg_per_px)):
+                out.extend(_split_by_sky(abbr, pts, visible))
     return out
+
+
+def _split_by_sky(abbr, pts, visible):
+    """Split one polyline into open-sky and foreground runs that meet at the boundary."""
+    if visible is None:
+        return [{'con': abbr, 'points': pts}]
+    arr = np.asarray(pts)
+    sky = visible(arr[:, 0], arr[:, 1])
+    runs, start = [], 0
+    for i in range(1, len(pts) + 1):
+        if i == len(pts) or sky[i] != sky[start]:
+            end = min(i + 1, len(pts))          # share the boundary point so runs join up
+            if end - start > 1:
+                run = {'con': abbr, 'points': pts[start:end]}
+                if not sky[start]:
+                    run['fg'] = True
+                runs.append(run)
+            start = i
+    return runs
 
 
 def _pick_step(span, steps, target_lines=5):
@@ -193,10 +321,12 @@ def _grid(wcs, width, height, centre, half_diag):
     return lines
 
 
-def annotate(solution):
+def annotate(solution, mono=None):
+    """mono: the photo (any size, same framing) used to hide overlays over the foreground."""
     wcs, width, height = solution.wcs, solution.width, solution.height
     centre, half_diag = _frame(wcs, width, height)
     fov = max(solution.fov_w, solution.fov_h)
+    visible = sky_support(solution, mono)
 
     # How deep to label depends on how much sky the photo covers.
     star_mag = 2.5 if fov > 45 else 3.5 if fov > 20 else 5.0 if fov > 8 else 6.5
@@ -213,38 +343,53 @@ def annotate(solution):
         if not items:
             return []
         x, y = _project(wcs, [t.ra for t in items], [t.dec for t in items], width, height, centre, half_diag * 1.05)
-        return [(t, float(xi), float(yi)) for t, xi, yi in zip(items, x, y) if np.isfinite(xi)]
+        ok = np.isfinite(x)
+        sky = np.ones(len(x), dtype=bool) if visible is None else visible(x, y)
+        return [(t, float(xi), float(yi), bool(s)) for t, xi, yi, k, s in zip(items, x, y, ok, sky) if k]
+
+    def fg(on_sky):
+        return {} if on_sky else {'fg': True}
 
     scale_deg_per_px = max(solution.scale_arcsec, 1e-6) / 3600.0
     out_stars = [{'x': round(x, 1), 'y': round(y, 1), 'label': t.name.split(' · ')[0], 'full': t.name,
-                  'mag': t.mag, 'constellation': t.con}
-                 for t, x, y in sorted(place(stars), key=lambda p: p[0].mag)]
+                  'mag': t.mag, 'constellation': t.con, **fg(sk)}
+                 for t, x, y, sk in sorted(place(stars), key=lambda p: p[0].mag)]
     out_dsos = [{'x': round(x, 1), 'y': round(y, 1), 'label': t.name, 'kind': t.kind, 'mag': t.mag,
                  'constellation': t.con,
-                 'r': round(max(6.0, (t.size or 0) / 60 / 2 / scale_deg_per_px), 1)}
-                for t, x, y in sorted(place(dsos), key=lambda p: p[0].rank)]
+                 'r': round(max(6.0, (t.size or 0) / 60 / 2 / scale_deg_per_px), 1), **fg(sk)}
+                for t, x, y, sk in sorted(place(dsos), key=lambda p: p[0].rank)]
 
     # Constellations: which ones the frame covers, labelled at the middle of their part of the frame.
     gx, gy = np.meshgrid(np.linspace(0.04, 0.96, 18) * width, np.linspace(0.04, 0.96, 12) * height)
     gx, gy = gx.ravel(), gy.ravel()
+    on_sky = np.ones(len(gx), dtype=bool) if visible is None else visible(gx, gy)
     sky = wcs.pixel_to_world(gx, gy)
     ok = np.isfinite(sky.ra.deg) & np.isfinite(sky.dec.deg)
-    gx, gy = gx[ok], gy[ok]
+    gx, gy, on_sky = gx[ok], gy[ok], on_sky[ok]
     # astropy spells one name "Ophiucus"; use the IAU spelling.
     names = np.asarray([n.replace('Ophiucus', 'Ophiuchus') for n in get_constellation(sky[ok])]) if ok.any() else np.array([])
     out_cons = []
     for name in dict.fromkeys(names):
         sel = names == name
-        if sel.sum() >= 3:
-            out_cons.append({'name': str(name), 'x': round(float(gx[sel].mean()), 1),
-                             'y': round(float(gy[sel].mean()), 1), 'share': round(float(sel.mean()), 3)})
+        if sel.sum() < 3:
+            continue
+        # Label a constellation in the middle of its open-sky part; one that lies entirely
+        # behind the foreground is labelled there and marked as foreground.
+        open_sel = sel & on_sky
+        use, is_fg = (open_sel, False) if open_sel.sum() >= 3 else (sel, True)
+        out_cons.append({'name': str(name), 'x': round(float(gx[use].mean()), 1),
+                         'y': round(float(gy[use].mean()), 1), 'share': round(float(sel.mean()), 3),
+                         **fg(not is_fg)})
     out_cons.sort(key=lambda c: -c['share'])
+    lines = constellation_lines(wcs, width, height, centre, half_diag, visible)
 
     return {
         'width': width, 'height': height,
+        'foreground': visible is not None and bool(
+            any(l.get('fg') for l in lines) or any(o.get('fg') for o in out_stars + out_dsos + out_cons)),
         'stars': out_stars,
         'dsos': out_dsos,
         'constellations': out_cons,
-        'lines': constellation_lines(wcs, width, height, centre, half_diag),
+        'lines': lines,
         'grid': _grid(wcs, width, height, centre, half_diag),
     }

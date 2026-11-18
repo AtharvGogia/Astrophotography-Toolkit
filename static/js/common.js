@@ -63,6 +63,43 @@ const Astro = (() => {
 
     // ---- Remember form values between visits and pages -------------------
     const STORE_KEY = 'astro-toolkit-form';
+    // After a user-started calculation on a narrow screen, scroll the answer into view
+    // (the form sits above it). Restored or automatic runs leave the page where it is.
+    function revealOnPhone(el, form) {
+        if (!el || !window.matchMedia('(max-width: 900px)').matches) return;
+        if (form && !form.contains(document.activeElement)) return;
+        const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        requestAnimationFrame(() => el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }));
+    }
+
+    function linkTargetInputs(nameEl, raEl, decEl, box) {
+        const clearCoords = () => {
+            raEl.value = '';
+            decEl.value = '';
+            if (box) box.open = false;
+        };
+        nameEl.addEventListener('target-picked', clearCoords);
+        nameEl.addEventListener('input', () => { if (nameEl.value.trim()) clearCoords(); });
+        const clearName = () => {
+            if (!raEl.value.trim() && !decEl.value.trim()) return;
+            if (nameEl.value) {
+                nameEl.value = '';
+                nameEl.dispatchEvent(new Event('input', { bubbles: true }));   // also clears the search's pick
+            }
+        };
+        raEl.addEventListener('input', clearName);
+        decEl.addEventListener('input', clearName);
+        // Saved state from before this rule may hold both: the name wins.
+        if (nameEl.value.trim() && (raEl.value.trim() || decEl.value.trim())) clearCoords();
+    }
+
+    function targetLabel(picked, name, ra, dec, haveCoords) {
+        const { fmtRA, fmtDec } = TargetSearch;
+        if (haveCoords) return `RA ${fmtRA(ra)}, Dec ${fmtDec(dec)}`;
+        if (picked) return `${picked.name.split(' · ')[0]} · RA ${fmtRA(picked.ra)}, Dec ${fmtDec(picked.dec)}`;
+        return name;
+    }
+
     function restoreFields(ids) {
         let saved = {};
         try { saved = JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); } catch (e) { /* storage blocked */ }
@@ -70,6 +107,8 @@ const Astro = (() => {
             const el = document.getElementById(id);
             if (el && saved[id] !== undefined && saved[id] !== '') el.value = saved[id];
         }
+        const box = document.getElementById('coordsBox');
+        if (box && ['customRA', 'customDec'].some((id) => saved[id] !== undefined && saved[id] !== '')) box.open = true;
     }
     function saveFields(ids) {
         let saved = {};
@@ -150,7 +189,65 @@ const Astro = (() => {
                `<circle cx="${c}" cy="${c}" r="${r}" class="moon-dark"/>${lit}</svg>`;
     }
 
-    return { toDeg, toRad, npfTime, npfSimple, rule500, sensorPointDec, fovDeg,
+    // Motion helpers. All of them do nothing visible under reduced motion or in a hidden tab,
+    // so the final state is always what the page shows.
+    const motion = (() => {
+        const EASE = 'cubic-bezier(0.16, 1, 0.3, 1)';
+        const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const still = () => reduced() || document.hidden;
+        const easeOut = (x) => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * x));
+
+        // A number that counts from its previous value (or 0) to the new one.
+        function countTo(el, to, fmt, ms = 650) {
+            const prev = parseFloat(el.dataset.v);
+            el.dataset.v = String(to);
+            cancelAnimationFrame(el._raf);
+            if (still()) { el.textContent = fmt(to); return; }
+            const from = Number.isFinite(prev) ? prev : 0, t0 = performance.now();
+            const frame = (now) => {
+                const k = Math.min(1, (now - t0) / ms);
+                el.textContent = fmt(from + (to - from) * easeOut(k));
+                if (k < 1) el._raf = requestAnimationFrame(frame);
+            };
+            el._raf = requestAnimationFrame(frame);
+        }
+
+        // Children of a list arriving one after another (total delay capped).
+        function stagger(nodes, { step = 30, max = 400, ms = 320, delay = null } = {}) {
+            if (still()) return;
+            const list = [...nodes];
+            const s = Math.min(step, max / Math.max(1, list.length));
+            list.forEach((n, i) => n.animate(
+                [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }],
+                { duration: ms, delay: delay ? delay(n, i) : i * s, easing: EASE, fill: 'backwards' }));
+        }
+
+        // The Moon's lit shape growing from new to tonight's phase.
+        function sweepMoon(container, illum, waxing, size, ms = 900) {
+            cancelAnimationFrame(container._raf);
+            container.innerHTML = moonSVG(illum, waxing, size);
+            if (still()) return;
+            const t0 = performance.now();
+            const frame = (now) => {
+                const k = Math.min(1, (now - t0) / ms);
+                container.innerHTML = moonSVG(illum * easeOut(k), waxing, size);
+                if (k < 1) container._raf = requestAnimationFrame(frame);
+            };
+            container._raf = requestAnimationFrame(frame);
+        }
+
+        // A sky image and its constellation lines drifting in, as if the camera had just slewed there.
+        function settleSky(els) {
+            const pan = reduced() ? [{ opacity: 0 }, { opacity: 1 }]
+                : [{ opacity: 0, transform: 'scale(1.06)' }, { opacity: 1, transform: 'none' }];
+            for (const e of els) e.animate(pan, { duration: reduced() ? 200 : 1100, easing: EASE, fill: 'backwards' });
+        }
+
+        return { EASE, reduced, still, countTo, stagger, sweepMoon, settleSky };
+    })();
+
+    return { motion, toDeg, toRad, npfTime, npfSimple, rule500, sensorPointDec, fovDeg,
              loadCameraPresets, restoreFields, saveFields, postJSON, drawSkyLines, loadSkyLines,
-             fmtTime, fmtDay, timeZoneName, nightStart, isoDate, utcIso, moonSVG };
+             fmtTime, fmtDay, timeZoneName, nightStart, isoDate, utcIso, moonSVG, revealOnPhone,
+             linkTargetInputs, targetLabel };
 })();

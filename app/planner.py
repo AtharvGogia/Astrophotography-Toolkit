@@ -165,6 +165,16 @@ def plan(lat, lon, start_iso, ra, dec, min_alt=30.0):
                         'moon_up_fraction': round(float(seg_moon.mean()), 2)})
     windows.sort(key=lambda w: -w['minutes'])
 
+    # Moonless windows: dark, target high enough, and the Moon below the horizon. A bright Moon
+    # washes out the Milky Way and faint nebulae, so beginners need this window, not the full one.
+    moonless = []
+    for s, e in _intervals(good & (moon_alt < 0)):
+        if e == s:
+            continue
+        moonless.append({'start': _ms(times[s]), 'end': _ms(times[e]), 'minutes': int((e - s) * STEP_MIN),
+                         'peak_alt': round(float(alt[s:e + 1].max()), 1)})
+    moonless.sort(key=lambda w: -w['minutes'])
+
     # Moon.
     mid = times[len(times) // 2]
     illum, waxing, phase = moon_phase(mid)
@@ -186,6 +196,7 @@ def plan(lat, lon, start_iso, ra, dec, min_alt=30.0):
         'min_alt': min_alt,
         'dark_kind': dark_kind,
         'windows': windows,
+        'moonless_windows': moonless,
         'moon': {'illumination': round(illum, 3), 'waxing': waxing, 'phase': phase,
                  'events': moon_events, 'separation': round(sep, 1)},
     }
@@ -265,10 +276,14 @@ def tonight(lat, lon, start_iso, limit=10, min_alt=25.0):
     # observing site), darkness is split across both ends of the range: report the longest stretch.
     dark_runs = _intervals(dark)
     longest = max(dark_runs, key=lambda r: r[1] - r[0]) if dark_runs else None
+    moon_runs = [r for r in _intervals(dark & (moon.alt.deg < 0)) if r[1] > r[0]]
+    moonless = max(moon_runs, key=lambda r: r[1] - r[0]) if moon_runs else None
     return {
         'dark_kind': dark_kind,
         'dark_start': _ms(times[longest[0]]) if longest else None,
         'dark_end': _ms(times[longest[1]]) if longest else None,
+        'moonless_start': _ms(times[moonless[0]]) if moonless else None,
+        'moonless_end': _ms(times[moonless[1]]) if moonless else None,
         'sun_events': sun_events,
         'moon': {'illumination': round(illum, 3), 'waxing': waxing, 'phase': phase, 'events': moon_events},
         'highlights': picks[:limit],

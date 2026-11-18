@@ -20,15 +20,17 @@ your target, before you head out.{% endblock %}
             Rotation turns the frame the way it would turn on your camera.</p>
         </div>
 
-        <div id="resultsBody" hidden>
+        <div id="resultsBody" class="result-layout" hidden>
+          <div class="result-side answer-panel">
             <p class="kicker">Framing &middot; <span id="targetLabel"></span></p>
-            <dl class="stats">
-                <div><dt>Field of view</dt><dd id="resFov"></dd></div>
+            <dl class="stats stack">
+                <div class="wide"><dt>Field of view</dt><dd id="resFov"></dd></div>
                 <div><dt>Diagonal</dt><dd id="resDiag"></dd></div>
                 <div><dt>Pixel scale</dt><dd id="resScale"></dd></div>
                 <div><dt>Centre RA</dt><dd id="resRA"></dd></div>
                 <div><dt>Centre Dec</dt><dd id="resDec"></dd></div>
             </dl>
+          </div>
 
             <figure class="viewfinder-figure">
                 <div class="viewfinder framing" id="framingView">
