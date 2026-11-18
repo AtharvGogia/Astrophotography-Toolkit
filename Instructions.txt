@@ -29,7 +29,7 @@ Go to http://nova.astrometry.net/ and create a free account.
 
 Log in, click your username, and go to "My profile".
 
-Your API key is listed on this page. The backend code (backend.py) has already been updated with the key you provided (ijfeegmtjoendrmy).
+Your API key is listed on this page. Put it in a config.py (copy config.example.py) or set the ASTROMETRY_API_KEY environment variable. Never commit the key.
 
 Step 3: Install Python Dependencies
 The backend requires several Python libraries. Open your terminal or command prompt and run the following command to install them:

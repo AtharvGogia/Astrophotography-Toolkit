@@ -16,3 +16,9 @@ skymap_tile_*.jpg
 composite_skymap_8k.jpg
 composite_skymap_16k.png
 skymapsplit/
+# Secrets
+config.py
+.env
+
+# Local sample images (large)
+Samples/

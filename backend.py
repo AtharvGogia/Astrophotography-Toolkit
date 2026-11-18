@@ -5,12 +5,12 @@ from flask_cors import CORS
 import json
 import math
 import io
+import time
 import numpy as np
 import traceback
 
 # Imports
-from astropy.coordinates import get_icrs_coordinates, SkyCoord, EarthLocation, AltAz
-from astropy.time import Time
+from astropy.coordinates import get_icrs_coordinates, SkyCoord
 from astropy import units as u
 from astropy.wcs import WCS
 from PIL import Image
@@ -18,15 +18,24 @@ from reproject import reproject_interp
 
 # --- Configuration ---
 Image.MAX_IMAGE_PIXELS = None
-app = Flask(__name__, static_folder='.', static_url_path='')
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, 'static')
+# Only the static/ folder is web-accessible; source and config files are not.
+app = Flask(__name__, static_folder=STATIC_DIR, static_url_path='')
 CORS(app)
 
-# API Constants & Key Loading
+# Longest side of the skymap preview image. The preview is shown at a few
+# hundred pixels, so rendering at full sensor resolution only wastes time.
+SKYMAP_PREVIEW_MAX_PX = 1600
+
+# API Constants & Key Loading (env var takes precedence over config.py)
 ASTROMETRY_API_URL = 'http://nova.astrometry.net/api'
-try:
-    from config import API_KEY
-except ImportError:
-    API_KEY = None
+API_KEY = os.environ.get('ASTROMETRY_API_KEY')
+if not API_KEY:
+    try:
+        from config import API_KEY
+    except ImportError:
+        API_KEY = None
 
 # Global State for pre-loading the skymap
 session_key = None
@@ -38,7 +47,7 @@ def load_skymap_data():
     """Pre-loads the single skymap image and computes its WCS at server startup."""
     global input_data, input_wcs
     
-    composite_map_path = 'composite_skymap_16k.png'
+    composite_map_path = os.environ.get('SKYMAP_PATH', os.path.join(BASE_DIR, 'composite_skymap_16k.png'))
     print(f"Attempting to pre-load skymap: {composite_map_path}")
 
     if not os.path.exists(composite_map_path):
@@ -46,10 +55,9 @@ def load_skymap_data():
         return
 
     try:
-        composite_image = Image.open(composite_map_path)
-        # Separate the RGB channels for reprojection
-        r, g, b = composite_image.split()
-        input_data = (np.array(r), np.array(g), np.array(b))
+        composite_image = Image.open(composite_map_path).convert('RGB')
+        # Channels-first (3, H, W) so all channels reproject in one call
+        input_data = np.moveaxis(np.asarray(composite_image), -1, 0)
 
         # WCS Definition for the single full-sky image
         w = WCS(naxis=2)
@@ -66,28 +74,42 @@ def load_skymap_data():
         input_wcs = None
 
 
-def get_apparent_coords(data):
-    # Calculate apparent RA/Dec from observer location and time
-    if 'ra' in data and 'dec' in data and data['ra'] is not None and data['dec'] is not None:
-        return SkyCoord(ra=data['ra']*u.degree, dec=data['dec']*u.degree)
+def get_target_coords(data):
+    """ICRS coordinates of the target, from custom RA/Dec or a name lookup.
 
-    location = EarthLocation(lon=data['longitude']*u.deg, lat=data['latitude']*u.deg)
-    obstime = Time.now()
-    base_coords = get_icrs_coordinates(data['target_name'])
-    altaz_frame = AltAz(obstime=obstime, location=location)
-    apparent_icrs = base_coords.transform_to(altaz_frame).transform_to('icrs')
-    return apparent_icrs
+    The previous version transformed ICRS -> AltAz -> ICRS, which returns the
+    same coordinates and made the observer location have no effect. Exposure
+    and framing only need the target's RA/Dec; location and time matter for
+    altitude/visibility (the planner), not here.
+    """
+    if data.get('ra') is not None and data.get('dec') is not None:
+        return SkyCoord(ra=float(data['ra'])*u.degree, dec=float(data['dec'])*u.degree)
+    return get_icrs_coordinates(data['target_name'])
+
+
+def build_sensor_wcs(coords, focal_length_mm, pixel_pitch_um, width_px, height_px, rotation_deg=0.0):
+    """Gnomonic (TAN) WCS for a camera sensor, as numpy rows (row 0 = top).
+
+    rotation_deg is the position angle of the image's "up" direction measured
+    from north through east. At 0 the image is north-up, east-left.
+    The TAN plate scale at the centre is exactly pixel_pitch / focal_length rad.
+    """
+    scale_deg = math.degrees((pixel_pitch_um / 1000.0) / focal_length_mm)
+    th = math.radians(rotation_deg)
+    w = WCS(naxis=2)
+    w.wcs.crpix = [(width_px + 1) / 2, (height_px + 1) / 2]
+    # Pixel axis 1 = column (right), axis 2 = row (down in the PNG).
+    w.wcs.cd = scale_deg * np.array([[-math.cos(th), -math.sin(th)],
+                                     [ math.sin(th), -math.cos(th)]])
+    w.wcs.crval = [coords.ra.degree, coords.dec.degree]
+    w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+    return w
 
 # --- Static File Routes ---
 @app.route('/')
 def serve_index():
-    # Serve main HTML file
-    return send_from_directory('.', 'index.html')
-
-@app.route('/<path:path>')
-def serve_static(path):
-    # Serve other static files (CSS, etc.)
-    return send_from_directory('.', path)
+    # Serve main HTML file; other static assets are served from static/ by Flask
+    return send_from_directory(STATIC_DIR, 'index.html')
 
 
 # --- API Endpoints ---
@@ -107,34 +129,22 @@ def get_skymap_crop():
         if not all([focal_length, sensor_width_px, sensor_height_px, pixel_pitch]):
             return jsonify({'error': 'Missing required camera parameters.'}), 400
 
-        coords = get_apparent_coords(data)
-        
-        # FOV Calculation
-        fov_width_deg = 2 * math.degrees(math.atan((pixel_pitch * sensor_width_px / 2000) / focal_length))
-        fov_height_deg = 2 * math.degrees(math.atan((pixel_pitch * sensor_height_px / 2000) / focal_length))
-        
-        # Output WCS Definition
-        output_wcs = WCS(naxis=2)
-        output_wcs.wcs.crpix = [(sensor_width_px + 1) / 2, (sensor_height_px + 1) / 2]
-        output_wcs.wcs.cdelt = np.array([-fov_width_deg / sensor_width_px, fov_height_deg / sensor_height_px])
-        output_wcs.wcs.crval = [coords.ra.degree, coords.dec.degree]
-        output_wcs.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+        coords = get_target_coords(data)
+        rotation_deg = float(data.get('rotation_deg') or 0.0)
 
-        # Reprojection
-        print(f"Reprojecting for target at RA {coords.ra.degree:.2f}, Dec {coords.dec.degree:.2f}...")
-        output_shape = (sensor_height_px, sensor_width_px)
-        
-        # DEFINITIVE FIX: Reproject each color channel individually.
-        # The input to reproject_interp must be a tuple of (data, wcs).
-        r_data, _ = reproject_interp((input_data[0], input_wcs), output_wcs, shape_out=output_shape)
-        g_data, _ = reproject_interp((input_data[1], input_wcs), output_wcs, shape_out=output_shape)
-        b_data, _ = reproject_interp((input_data[2], input_wcs), output_wcs, shape_out=output_shape)
-        
-        # Stack the reprojected channels back into an RGB image.
-        reprojected_data = np.stack([r_data, g_data, b_data], axis=-1)
+        # Render a downscaled preview with the same field of view: shrinking the
+        # sensor by `factor` and growing the pixel pitch by `factor` keeps the FOV.
+        factor = max(1.0, max(sensor_width_px, sensor_height_px) / SKYMAP_PREVIEW_MAX_PX)
+        out_w = max(1, round(sensor_width_px / factor))
+        out_h = max(1, round(sensor_height_px / factor))
+        output_wcs = build_sensor_wcs(coords, focal_length, pixel_pitch * factor, out_w, out_h, rotation_deg)
 
-        reprojected_data = np.nan_to_num(reprojected_data).astype(np.uint8)
-        print("Reprojection complete.")
+        print(f"Reprojecting {out_w}x{out_h} preview for RA {coords.ra.degree:.2f}, Dec {coords.dec.degree:.2f}...")
+        t0 = time.perf_counter()
+        # All three channels in one call: input is (3, H, W) with a 2D WCS.
+        reprojected, _ = reproject_interp((input_data, input_wcs), output_wcs, shape_out=(out_h, out_w))
+        reprojected_data = np.nan_to_num(np.moveaxis(reprojected, 0, -1)).clip(0, 255).astype(np.uint8)
+        print(f"Reprojection complete in {time.perf_counter() - t0:.2f}s.")
 
         # Prepare and Send Response
         output_image = Image.fromarray(reprojected_data)
@@ -156,8 +166,8 @@ def get_declination():
     # Fetches celestial coordinates for a target
     data = request.get_json()
     try:
-        coords = get_apparent_coords(data)
-        return jsonify({'declination': coords.dec.degree})
+        coords = get_target_coords(data)
+        return jsonify({'declination': coords.dec.degree, 'ra': coords.ra.degree})
     except Exception as e:
         return jsonify({'error': f"Could not find coordinates. {e}"}), 404
 
@@ -235,5 +245,6 @@ if __name__ == '__main__':
         print("\nWARNING: Astrometry.net API key not found.")
         print("Please create and fill in the 'config.py' file with your API key.\n")
     print("Navigate to http://127.0.0.1:5000")
-    app.run(port=5000, debug=True)
+    # Debug mode (interactive debugger, auto-reload) only when explicitly asked for.
+    app.run(port=5000, debug=os.environ.get('FLASK_DEBUG') == '1')
 

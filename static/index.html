@@ -64,7 +64,12 @@
                 <input type="number" id="sensorHeight" placeholder="e.g., 4000">
             </div>
         </div>
-        
+        <div class="input-group">
+            <label for="rotation">Camera Rotation (°, optional)</label>
+            <input type="number" id="rotation" placeholder="0 = north up" step="any">
+            <div class="info">Angle of the frame's top edge from north towards east. Leave empty for north-up.</div>
+        </div>
+
         <hr>
 
         <h2>3. Target</h2>
@@ -197,6 +202,7 @@
     const apertureEl = document.getElementById('aperture');
     const sensorWidthEl = document.getElementById('sensorWidth');
     const sensorHeightEl = document.getElementById('sensorHeight');
+    const rotationEl = document.getElementById('rotation');
     const targetNameEl = document.getElementById('targetName');
     const customRAEl = document.getElementById('customRA');
     const customDecEl = document.getElementById('customDec');
@@ -211,6 +217,29 @@
     const sensorGridContainer = document.getElementById('sensorGridContainer');
 
     const toDegrees = (rad) => rad * (180 / Math.PI);
+    const toRadians = (deg) => deg * (Math.PI / 180);
+
+    // Declinations closer to a pole than this are clamped: 1/cos(dec) blows up at ±90°.
+    const MAX_ABS_DEC = 89;
+
+    // Full NPF rule (Frédéric Michaud, Société Astronomique du Havre), k = 1:
+    //   t = (16.856·N + 0.0997·F + 13.713·p) / (F · cos δ)
+    const npfTime = (N, F, P, decDeg) => {
+        const dec = Math.max(-MAX_ABS_DEC, Math.min(MAX_ABS_DEC, decDeg));
+        return (16.856 * N + 0.0997 * F + 13.713 * P) / (F * Math.cos(toRadians(dec)));
+    };
+
+    // Declination of a point on the sensor, via the inverse gnomonic (TAN) projection.
+    // (x, y) are offsets from the sensor centre in mm, x right and y up; rotation is the
+    // position angle of the frame's "up" from north through east (0 = north up, east left).
+    const sensorPointDec = (centerDecDeg, xMm, yMm, F, rotationDeg) => {
+        const th = toRadians(rotationDeg);
+        const xi = (-xMm * Math.cos(th) + yMm * Math.sin(th)) / F;   // towards east
+        const eta = (xMm * Math.sin(th) + yMm * Math.cos(th)) / F;   // towards north
+        const d0 = toRadians(centerDecDeg);
+        const s = (Math.sin(d0) + eta * Math.cos(d0)) / Math.sqrt(1 + xi * xi + eta * eta);
+        return toDegrees(Math.asin(Math.max(-1, Math.min(1, s))));
+    };
 
     calculateBtn.addEventListener('click', async () => {
         // UI Reset
@@ -236,6 +265,7 @@
         const targetName = targetNameEl.value.trim();
         const customRA = customRAEl.value ? parseFloat(customRAEl.value) : null;
         const customDec = customDecEl.value ? parseFloat(customDecEl.value) : null;
+        const rotationDeg = rotationEl.value ? parseFloat(rotationEl.value) : 0;
 
         const allFieldsValid = !isNaN(lat) && !isNaN(lon) && !isNaN(P) && !isNaN(F) && !isNaN(N) && !isNaN(sensorWidthPx) && !isNaN(sensorHeightPx);
         const hasTarget = targetName || (customRA !== null && customDec !== null);
@@ -273,38 +303,33 @@
             resultsContainer.style.display = 'block';
             const centerDec = declinationData.declination;
             const simplifiedTime = ((35 * N) + (30 * P)) / F;
-            simplifiedResultTextEl.innerHTML = `Simplified NPF: <span>${simplifiedTime.toFixed(1)} s</span>`;
+            simplifiedResultTextEl.innerHTML = `Simplified NPF (assumes δ ≈ 60°): <span>${simplifiedTime.toFixed(1)} s</span>`;
 
+            const sensorWidthMm = P * sensorWidthPx / 1000;
             const sensorHeightMm = P * sensorHeightPx / 1000;
-            const fovHeightDeg = toDegrees(2 * Math.atan((sensorHeightMm / 2) / F));
-            const topDec = centerDec + (fovHeightDeg / 2);
-            const bottomDec = centerDec - (fovHeightDeg / 2);
+            const centerTime = npfTime(N, F, P, centerDec);
 
-            const getNpfTime = (dec) => {
-                const deltaRad = dec * (Math.PI / 180);
-                return ((13.7 * P) + (7.9 * N)) / (F * Math.cos(deltaRad));
-            };
+            // 3x3 grid: evaluate the NPF time at the centre of each cell.
+            // The whole frame is limited by the shortest cell time (the cell nearest the equator).
+            let cells = '';
+            let minTime = Infinity;
+            for (const row of [1, 0, -1]) {            // top, middle, bottom (y up)
+                for (const col of [-1, 0, 1]) {        // left, centre, right
+                    const dec = sensorPointDec(centerDec, col * sensorWidthMm / 3, row * sensorHeightMm / 3, F, rotationDeg);
+                    const t = npfTime(N, F, P, dec);
+                    minTime = Math.min(minTime, t);
+                    cells += `<div class="sensor-cell"><strong>${t.toFixed(1)} s</strong><span>(${dec.toFixed(1)}°)</span></div>`;
+                }
+            }
 
-            const centerTime = getNpfTime(centerDec);
-            const topTime = getNpfTime(topDec);
-            const bottomTime = getNpfTime(bottomDec);
-
-            resultTextEl.innerHTML = `Declination-Adjusted (Center): <span>${centerTime.toFixed(1)} s</span>`;
-            sensorGridEl.innerHTML = `
-                <div class="sensor-cell"><strong>${topTime.toFixed(1)} s</strong><span>(${topDec.toFixed(1)}°)</span></div>
-                <div class="sensor-cell"><strong>${topTime.toFixed(1)} s</strong><span>(${topDec.toFixed(1)}°)</span></div>
-                <div class="sensor-cell"><strong>${topTime.toFixed(1)} s</strong><span>(${topDec.toFixed(1)}°)</span></div>
-                <div class="sensor-cell"><strong>${centerTime.toFixed(1)} s</strong><span>(${centerDec.toFixed(1)}°)</span></div>
-                <div class="sensor-cell"><strong>${centerTime.toFixed(1)} s</strong><span>(${centerDec.toFixed(1)}°)</span></div>
-                <div class="sensor-cell"><strong>${centerTime.toFixed(1)} s</strong><span>(${centerDec.toFixed(1)}°)</span></div>
-                <div class="sensor-cell"><strong>${bottomTime.toFixed(1)} s</strong><span>(${bottomDec.toFixed(1)}°)</span></div>
-                <div class="sensor-cell"><strong>${bottomTime.toFixed(1)} s</strong><span>(${bottomDec.toFixed(1)}°)</span></div>
-                <div class="sensor-cell"><strong>${bottomTime.toFixed(1)} s</strong><span>(${bottomDec.toFixed(1)}°)</span></div>`;
+            resultTextEl.innerHTML = `Declination-Adjusted (Center): <span>${centerTime.toFixed(1)} s</span><br>` +
+                `Whole frame (shortest cell): <span>${minTime.toFixed(1)} s</span>`;
+            sensorGridEl.innerHTML = cells;
             sensorRepresentationHeading.style.display = 'block';
             sensorGridContainer.style.display = 'grid';
 
             // --- Step 3: Fetch Skymap Image in the background (Slow) ---
-            const skymapPayload = { ...payload, focal_length: F, sensor_width_px: sensorWidthPx, sensor_height_px: sensorHeightPx, pixel_pitch: P };
+            const skymapPayload = { ...payload, focal_length: F, sensor_width_px: sensorWidthPx, sensor_height_px: sensorHeightPx, pixel_pitch: P, rotation_deg: rotationDeg };
             fetch('/api/get_skymap_crop', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

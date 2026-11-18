@@ -12,7 +12,7 @@ Local Setup
 Download only the composite_skymap_16k.png from "https://drive.google.com/drive/folders/1rrDNBE-_NzLOH3oTllvlRFs0W_YL9cPu?usp=sharing" and place it in the root folder.(Optional for sensor visual representation)
 
 2. API Key
-The image analyzer requires a free API key from nova.astrometry.net. You must place this key in a config.py file.
+The image analyzer requires a free API key from nova.astrometry.net. Either set the ASTROMETRY_API_KEY environment variable, or copy config.example.py to config.py and paste the key there. config.py is gitignored; never commit your key.
 
 3. Dependencies
 With Python and Pip installed, run the following in your project folder:
@@ -25,3 +25,9 @@ Finally, start the backend server:
 python backend.py
 
 You can then access the toolkit at http://127.0.0.1:5000 in your browser.
+
+Optional environment variables:
+- SKYMAP_PATH: path to the skymap image (default: composite_skymap_16k.png in the project root)
+- FLASK_DEBUG=1: run Flask in debug mode (off by default)
+
+The web frontend lives in static/; only that folder is served.
