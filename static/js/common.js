@@ -90,6 +90,29 @@ const Astro = (() => {
         return resp;
     }
 
+    // Draw constellation figures ({width, height, lines: [{con, points}]}) into an <svg>.
+    function drawSkyLines(svg, data) {
+        const NS = 'http://www.w3.org/2000/svg';
+        svg.innerHTML = '';
+        svg.setAttribute('viewBox', `0 0 ${data.width} ${data.height}`);
+        svg.style.setProperty('--u', Math.max(data.width, data.height) / 1000);
+        for (const line of data.lines) {
+            const pl = document.createElementNS(NS, 'polyline');
+            pl.setAttribute('points', line.points.map((p) => p.join(',')).join(' '));
+            pl.setAttribute('class', 'con-line');
+            svg.appendChild(pl);
+        }
+    }
+
+    // Fetch and draw the figures for a sky preview request (same payload as /api/skymap).
+    async function loadSkyLines(svg, payload) {
+        svg.innerHTML = '';
+        try {
+            const resp = await postJSON('/api/skylines', payload);
+            if (resp.ok) drawSkyLines(svg, await resp.json());
+        } catch (e) { /* lines are decoration; the preview still works without them */ }
+    }
+
     return { toDeg, toRad, npfTime, npfSimple, rule500, sensorPointDec, fovDeg,
-             loadCameraPresets, restoreFields, saveFields, postJSON };
+             loadCameraPresets, restoreFields, saveFields, postJSON, drawSkyLines, loadSkyLines };
 })();

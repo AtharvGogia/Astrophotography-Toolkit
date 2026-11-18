@@ -1,89 +1,68 @@
-"""Image analyzer API.
+"""Image analyzer API: plate-solve an uploaded photo on this computer and label what is in it.
 
-For now this proxies nova.astrometry.net. Phase 2 replaces it with the local
-solver; the astrometry.net path is kept until then as a reference.
+POST /api/analyze            multipart: image (file), optional fov_hint (degrees) -> {job_id}
+GET  /api/jobs/<id>          state, progress, message, result
+GET  /api/jobs/<id>/preview  JPEG preview of the uploaded photo
 """
-import json
+import io
+import math
 
-import requests
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
+from PIL import Image
 
-from .. import jobs, settings
+from .. import annotate, imageio, jobs, solver
 
 bp = Blueprint('analyzer', __name__, url_prefix='/api')
 
-_session_key = None
-_TIMEOUT = 60
+
+def _run(job, data, filename, fov_hint):
+    job.update(0.02, 'Reading the photo…')
+    img = imageio.load(data, filename)
+    buf = io.BytesIO()
+    Image.fromarray(img.preview).save(buf, 'JPEG', quality=88)
+    job.files['preview'] = (buf.getvalue(), 'image/jpeg')
+
+    solution = solver.solve(img.mono, fov_hint=fov_hint, progress=job.update)
+    job.update(0.9, 'Labelling stars and objects…')
+    labels = annotate.annotate(solution)
+    return {'solution': solution.to_dict(), 'annotations': labels,
+            'preview': f'/api/jobs/{job.id}/preview', 'filename': filename}
 
 
-def _astrometry_session():
-    global _session_key
-    if _session_key:
-        return _session_key
-    key = settings.load_api_key()
-    if not key:
-        raise RuntimeError('Astrometry.net API key not configured (set ASTROMETRY_API_KEY or config.py).')
-    resp = requests.post(f'{settings.ASTROMETRY_API_URL}/login',
-                         data={'request-json': json.dumps({'apikey': key})}, timeout=_TIMEOUT)
-    resp.raise_for_status()
-    data = resp.json()
-    if data.get('status') != 'success':
-        raise RuntimeError(f"Astrometry.net login failed: {data.get('errormessage')}")
-    _session_key = data['session']
-    return _session_key
-
-
-@bp.post('/upload')
-def upload_image():
-    if 'image' not in request.files:
-        return jsonify({'error': 'No image file in request.'}), 400
-    try:
-        session = _astrometry_session()
-        file = request.files['image']
-        resp = requests.post(f'{settings.ASTROMETRY_API_URL}/upload',
-                             data={'request-json': json.dumps({'session': session, 'publicly_visible': 'n'})},
-                             files={'file': (file.filename, file.read(), file.mimetype)}, timeout=300)
-        resp.raise_for_status()
-        data = resp.json()
-    except Exception as exc:
-        return jsonify({'error': str(exc)}), 500
-    if data.get('status') != 'success':
-        return jsonify({'error': data.get('errormessage', 'Upload failed')}), 500
-    return jsonify({'sub_id': data['subid']})
-
-
-@bp.get('/status/<int:sub_id>')
-def get_status(sub_id):
-    try:
-        resp = requests.get(f'{settings.ASTROMETRY_API_URL}/submissions/{sub_id}', timeout=_TIMEOUT)
-        resp.raise_for_status()
-        data = resp.json()
-        job_id, status, annotated_url = None, 'pending', None
-        if data.get('jobs') and data['jobs'][0] is not None:
-            job_id = data['jobs'][0]
-            info = requests.get(f'{settings.ASTROMETRY_API_URL}/jobs/{job_id}/info', timeout=_TIMEOUT)
-            info.raise_for_status()
-            status = info.json().get('status', 'unknown')
-            if status == 'success':
-                annotated_url = f'https://nova.astrometry.net/annotated_display/{job_id}'
-        return jsonify({'status': status, 'job_id': job_id, 'annotated_image_url': annotated_url})
-    except Exception as exc:
-        return jsonify({'error': str(exc)}), 500
-
-
-@bp.get('/results/<int:job_id>')
-def get_results(job_id):
-    try:
-        resp = requests.get(f'{settings.ASTROMETRY_API_URL}/jobs/{job_id}/annotations', timeout=_TIMEOUT)
-        resp.raise_for_status()
-        return jsonify({'annotations': resp.json().get('annotations', [])})
-    except Exception as exc:
-        return jsonify({'error': str(exc)}), 500
+@bp.post('/analyze')
+def analyze():
+    file = request.files.get('image')
+    if file is None or not file.filename:
+        return jsonify({'error': 'No photo in the request.'}), 400
+    ext = ('.' + file.filename.rsplit('.', 1)[-1].lower()) if '.' in file.filename else ''
+    if ext not in imageio.SUPPORTED_EXT:
+        return jsonify({'error': f"Unsupported file type '{ext or file.filename}'."}), 400
+    fov_hint = None
+    raw_hint = request.form.get('fov_hint', '').strip()
+    if raw_hint:
+        try:
+            fov_hint = float(raw_hint)
+        except ValueError:
+            return jsonify({'error': 'fov_hint must be a number of degrees.'}), 400
+        if not math.isfinite(fov_hint) or not 0.1 <= fov_hint <= 180:
+            return jsonify({'error': 'fov_hint must be between 0.1 and 180 degrees.'}), 400
+    data = file.read()
+    job = jobs.submit(_run, data, file.filename, fov_hint)
+    return jsonify({'job_id': job.id}), 202
 
 
 @bp.get('/jobs/<job_id>')
 def job_status(job_id):
     job = jobs.get(job_id)
     if job is None:
-        return jsonify({'error': 'Unknown job.'}), 404
+        return jsonify({'error': 'Unknown or expired job.'}), 404
     return jsonify(job.to_dict())
+
+
+@bp.get('/jobs/<job_id>/preview')
+def job_preview(job_id):
+    job = jobs.get(job_id)
+    if job is None or 'preview' not in job.files:
+        return jsonify({'error': 'No preview for this job.'}), 404
+    body, mimetype = job.files['preview']
+    return Response(body, mimetype=mimetype, headers={'Cache-Control': 'private, max-age=3600'})

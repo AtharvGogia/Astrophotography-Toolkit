@@ -223,3 +223,11 @@ def test_preview_rejects_non_finite_numbers(client, bad):
 def test_blank_coordinates_fall_back_to_name(client):
     data = client.post('/api/resolve', json={'target_name': 'M31', 'ra': '', 'dec': ''}).get_json()
     assert data['dec'] == pytest.approx(41.27, abs=0.01)
+
+
+def test_skylines_match_preview_geometry(client):
+    payload = dict(ra=83.8, dec=-5.4, focal_length=35, sensor_width_px=6000, sensor_height_px=4000, pixel_pitch=5.93)
+    data = client.post('/api/skylines', json=payload).get_json()
+    assert (data['width'], data['height']) == (1600, 1067)
+    assert any(line['con'] == 'Ori' for line in data['lines'])
+    assert client.post('/api/skylines', json={**payload, 'focal_length': 'nan'}).status_code == 400

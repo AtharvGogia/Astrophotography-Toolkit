@@ -28,3 +28,6 @@ catalog_raw/
 
 # Local Claude Code preview config
 .claude/
+
+# Plate-solving index, built on first use
+app/solver/cache/

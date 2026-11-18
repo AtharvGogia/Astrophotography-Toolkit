@@ -1,6 +1,8 @@
 # Catalog data
 
-The files in this folder are trimmed copies of two open catalogs, made with
+## Stars and deep-sky objects (CC BY-SA 4.0)
+
+`stars.csv` and `dso.csv` are trimmed copies of two open catalogs, made with
 `scripts/build_catalogs.py`. Both sources, and these derived files, are licensed under
 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
 
@@ -14,3 +16,10 @@ The files in this folder are trimmed copies of two open catalogs, made with
 
 Changes made: rows filtered by magnitude and type, columns removed, coordinates converted
 to decimal degrees, NGC/IC identifiers reformatted (`NGC0224` → `NGC 224`).
+
+## Constellation figures (BSD 3-Clause)
+
+`constellation_lines.json` is the constellation stick-figure file from **d3-celestial** by
+Olaf Frohn, <https://github.com/ofrohn/d3-celestial> (`data/constellations.lines.json`),
+copied unchanged. It is under the BSD 3-Clause licence; the full licence text is in
+`LICENSE-d3-celestial.txt`.

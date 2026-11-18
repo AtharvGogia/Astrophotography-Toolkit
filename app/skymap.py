@@ -84,6 +84,16 @@ def build_sensor_wcs(coords, focal_length_mm, pixel_pitch_um, width_px, height_p
     return w
 
 
+def preview_wcs(coords, focal_length_mm, pixel_pitch_um, width_px, height_px, rotation_deg=0.0, context=1.0):
+    """WCS and size of the preview image for a sensor (downscaled, same field; wider by `context`)."""
+    # Shrinking the output by `factor` and growing the pitch by `factor` keeps the field.
+    factor = max(1.0, max(width_px, height_px) / settings.SKYMAP_PREVIEW_MAX_PX)
+    out_w = max(1, round(width_px / factor))
+    out_h = max(1, round(height_px / factor))
+    wcs = build_sensor_wcs(coords, focal_length_mm, pixel_pitch_um * factor * context, out_w, out_h, rotation_deg)
+    return wcs, out_w, out_h
+
+
 def render(coords, focal_length_mm, pixel_pitch_um, width_px, height_px, rotation_deg=0.0, context=1.0):
     """Render the sky seen by the sensor as an RGB uint8 array (preview-sized).
 
@@ -92,11 +102,7 @@ def render(coords, focal_length_mm, pixel_pitch_um, width_px, height_px, rotatio
     """
     if not is_loaded():
         raise RuntimeError('Skymap is not loaded.')
-    # Shrinking the output by `factor` and growing the pitch by `factor` keeps the field.
-    factor = max(1.0, max(width_px, height_px) / settings.SKYMAP_PREVIEW_MAX_PX)
-    out_w = max(1, round(width_px / factor))
-    out_h = max(1, round(height_px / factor))
-    wcs = build_sensor_wcs(coords, focal_length_mm, pixel_pitch_um * factor * context, out_w, out_h, rotation_deg)
+    wcs, out_w, out_h = preview_wcs(coords, focal_length_mm, pixel_pitch_um, width_px, height_px, rotation_deg, context)
 
     t0 = time.perf_counter()
     data, _ = reproject_interp((_input_data, _input_wcs), wcs, shape_out=(out_h, out_w))

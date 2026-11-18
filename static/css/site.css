@@ -352,6 +352,7 @@ button.primary:disabled { opacity: 0.6; cursor: progress; }
 .sensor-grid {
     position: absolute;
     inset: 0;
+    z-index: 2;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     grid-template-rows: repeat(3, 1fr);
@@ -427,7 +428,65 @@ progress::-moz-progress-bar { background: var(--accent); }
     color: var(--text-faint);
 }
 
+.hint-box { flex: 1 1 100%; order: 3; }
+.hint-box summary { cursor: pointer; font-size: 0.86rem; color: var(--text-dim); }
+.hint-box summary:hover { color: var(--text); }
+.hint-box[open] summary { margin-bottom: 0.8rem; }
+.hint-box .field-row { max-width: 560px; }
+.upload-form button.primary { order: 2; }
+.upload-form .error { order: 4; }
+.solver-range { margin-top: 0.8rem; }
+.progress-msg { margin: 0.7rem 0 0; color: var(--text-dim); font-size: 0.9rem; }
+code { font-family: var(--mono); font-size: 0.9em; color: var(--text-dim); }
+
 .analysis { margin-top: 3rem; }
+.analysis .viewfinder-figure { margin-bottom: 3rem; }
+.analysis .analysis-cols { grid-template-columns: 1fr 1.4fr; }
+.analysis .stats { grid-template-columns: 1fr 1fr; }
+.analysis .stats div:nth-child(odd) { padding-left: 0; border-left: 0; }
+.analysis .stats div:nth-child(n+3) { border-top: 1px solid var(--rule-soft); }
+
+.layer-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.layer {
+    height: 32px;
+    padding: 0 14px;
+    border: 1px solid var(--rule);
+    background: transparent;
+    color: var(--text-faint);
+    font: 500 0.8rem var(--sans);
+    letter-spacing: 0.03em;
+    cursor: pointer;
+}
+.layer[aria-pressed="true"] { color: var(--text); border-color: var(--accent); }
+.layer:hover { color: var(--text); }
+
+/* Labels drawn over the photo. Sizes are in image pixels via --u (set by analyzer.js). */
+.overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; }
+.overlay circle { pointer-events: all; cursor: help; }
+.overlay text { font-family: var(--sans); paint-order: stroke; stroke: rgba(0, 0, 0, 0.75); stroke-width: calc(var(--u) * 3px); stroke-linejoin: round; }
+.overlay .grid-ra, .overlay .grid-dec { fill: none; stroke: rgba(160, 175, 200, 0.45); stroke-width: calc(var(--u) * 1px); stroke-dasharray: calc(var(--u) * 6px) calc(var(--u) * 6px); }
+.overlay .grid-label { fill: rgba(170, 185, 210, 0.85); font-family: var(--mono); }
+/* Constellation figures: on photos (inside .overlay) and on sky previews (.sky-lines). */
+.sky-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; z-index: 1; }
+.overlay .con-line, .sky-lines .con-line {
+    fill: none;
+    stroke: rgba(200, 164, 110, 0.55);
+    stroke-width: calc(var(--u) * 1.5px);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+:root[data-mode="lowlight"] .overlay .con-line,
+:root[data-mode="lowlight"] .sky-lines .con-line { stroke: var(--accent); stroke-opacity: 0.6; }
+.overlay .con-label { fill: rgba(230, 216, 192, 0.55); font-family: var(--serif); font-weight: 300; letter-spacing: 0.25em; }
+.overlay .dso-ring { fill: none; stroke: #e8a089; stroke-width: calc(var(--u) * 1.6px); }
+.overlay .dso-label { fill: #f1c2b2; font-weight: 500; }
+.overlay .star-ring { fill: none; stroke: var(--accent); stroke-width: calc(var(--u) * 1.6px); }
+.overlay .star-label { fill: #efe3cf; }
+:root[data-mode="lowlight"] .overlay .dso-ring,
+:root[data-mode="lowlight"] .overlay .star-ring { stroke: var(--accent); }
+:root[data-mode="lowlight"] .overlay text { fill: var(--text); }
+:root[data-mode="lowlight"] .overlay .grid-ra,
+:root[data-mode="lowlight"] .overlay .grid-dec { stroke: var(--rule); }
 .analysis-cols { display: grid; grid-template-columns: 1.7fr 1fr; gap: 56px; align-items: start; }
 .object-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
 .object-table th {

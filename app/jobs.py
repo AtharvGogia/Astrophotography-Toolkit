@@ -24,6 +24,7 @@ class Job:
         self.result = None
         self.error = None
         self.created = time.time()
+        self.files = {}              # name -> (bytes, mimetype), e.g. a preview image
 
     def update(self, progress=None, message=None):
         if progress is not None:
@@ -49,8 +50,10 @@ def submit(fn, *args, **kwargs):
             job.result = fn(job, *args, **kwargs)
             job.state, job.progress, job.message = 'done', 1.0, 'Done'
         except Exception as exc:
-            traceback.print_exc()
-            job.state, job.error, job.message = 'failed', str(exc), 'Failed'
+            # Expected failures (bad file, no solution) carry a user-facing message; log the rest.
+            if not isinstance(exc, (ValueError, LookupError)) and type(exc).__name__ != 'SolveError':
+                traceback.print_exc()
+            job.state, job.error, job.message = 'failed', str(exc) or type(exc).__name__, 'Failed'
 
     _executor.submit(run)
     return job

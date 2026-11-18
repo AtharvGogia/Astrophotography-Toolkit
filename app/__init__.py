@@ -17,6 +17,10 @@ def create_app(load_skymap=True):
 
     if load_skymap:
         skymap.load()
-    # Build the target search index in the background so the first search is instant.
+    # Warm up in the background so the first search / first analysis doesn't wait:
+    # the target search index, and the plate-solving index (built once, then loaded from disk).
     threading.Thread(target=catalogs.targets, daemon=True).start()
+    if load_skymap:
+        from .solver import index
+        threading.Thread(target=index.get, daemon=True).start()
     return app

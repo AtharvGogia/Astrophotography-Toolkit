@@ -97,11 +97,11 @@
         const img = $('skyImage');
         img.hidden = true;
         $('skyStatus').textContent = 'Drawing the sky…';
+        const skyPayload = { ra: center.ra, dec: center.dec, focal_length: F, sensor_width_px: wPx,
+                             sensor_height_px: hPx, pixel_pitch: p, rotation_deg: 0, context: ctx };
+        Astro.loadSkyLines($('skyLines'), skyPayload);
         try {
-            const resp = await Astro.postJSON('/api/skymap', {
-                ra: center.ra, dec: center.dec, focal_length: F, sensor_width_px: wPx, sensor_height_px: hPx,
-                pixel_pitch: p, rotation_deg: 0, context: ctx,
-            });
+            const resp = await Astro.postJSON('/api/skymap', skyPayload);
             if (!resp.ok) {
                 const data = await resp.json().catch(() => ({}));
                 throw new Error(data.error || 'Sky preview failed.');

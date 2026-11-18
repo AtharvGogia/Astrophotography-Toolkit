@@ -67,6 +67,8 @@ class Target:
     rank: float = 0.0    # lower = more prominent
     keys: list = field(default_factory=list)
     words: set = field(default_factory=set)
+    size: float = None   # major axis in arcminutes (deep-sky objects)
+    featured: bool = False  # has a Messier number or a common name
 
     def __post_init__(self):
         # Individual words of the display name, for "starts a word" matches ("neb" -> Lagoon Nebula).
@@ -143,7 +145,8 @@ def _build_targets():
             mag = _float(r['mag'])
             rank = (-10 if r['messier'] else -5 if commons else 0) + (mag if mag is not None else 12)
             targets.append(Target(label, DSO_TYPES.get(r['type'], r['type']), float(r['ra']), float(r['dec']),
-                                  CONSTELLATIONS.get(r['con'], r['con']), mag, rank, keys))
+                                  CONSTELLATIONS.get(r['con'], r['con']), mag, rank, keys,
+                                  size=_float(r['maj']), featured=bool(r['messier'] or commons)))
 
     # Constellations: centre = brightness-weighted mean of their naked-eye stars.
     for abbr, pts in con_pos.items():
@@ -157,6 +160,25 @@ def _build_targets():
         targets.append(Target(full, 'Constellation', ra, dec, full, None, rank=-20,
                               keys=[_norm(full), _norm(abbr)]))
     return targets
+
+
+_lines = None
+
+
+def constellation_lines():
+    """Constellation stick figures: list of (abbreviation, [[(ra, dec), ...], ...]) in degrees.
+
+    From d3-celestial (BSD 3-Clause), which stores RA as longitude in -180..180.
+    """
+    global _lines
+    if _lines is None:
+        import json
+        with open(os.path.join(DATA_DIR, 'constellation_lines.json'), encoding='utf-8') as f:
+            data = json.load(f)
+        _lines = [(feat['id'], [[(lon % 360.0, lat) for lon, lat in line]
+                                for line in feat['geometry']['coordinates']])
+                  for feat in data['features']]
+    return _lines
 
 
 def targets():
