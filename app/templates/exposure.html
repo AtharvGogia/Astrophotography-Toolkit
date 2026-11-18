@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Exposure{% endblock %}
+{% block heading %}Exposure calculator{% endblock %}
+{% block lede %}How long can the shutter stay open before the stars start to trail? Worked out with
+Frédéric Michaud's NPF rule from your aperture, focal length, pixel size and the target's declination.{% endblock %}
+{% block content %}
+<div class="split">
+    <form id="exposureForm" class="calc-form" novalidate>
+        <fieldset>
+            <legend>Location</legend>
+            <div class="field-row">
+                <div class="field">
+                    <label for="latitude">Latitude (°)</label>
+                    <input type="number" id="latitude" placeholder="28.45" step="any" min="-90" max="90">
+                </div>
+                <div class="field">
+                    <label for="longitude">Longitude (°)</label>
+                    <input type="number" id="longitude" placeholder="77.02" step="any" min="-180" max="180">
+                </div>
+            </div>
+        </fieldset>
+
+        {% set with_aperture = true %}
+        {% include "_camera_fields.html" %}
+
+        <button type="submit" id="calculateBtn" class="primary">Calculate</button>
+        <p class="error" id="formError" role="alert"></p>
+    </form>
+
+    <section class="results" id="results" aria-live="polite">
+        <div id="resultsEmpty" class="empty">
+            <p class="kicker">Results</p>
+            <p>Fill in your camera, lens and target, then press <em>Calculate</em>.</p>
+            <p class="muted">You'll get the longest exposure for the whole frame, plus a 3 × 3 map of how it
+            changes across the sensor, drawn over the sky your camera will see.</p>
+        </div>
+
+        <div id="resultsBody" hidden>
+            <p class="kicker">Longest exposure &middot; <span id="targetLabel"></span></p>
+            <div class="readout">
+                <span class="readout-value" id="resWhole"></span>
+                <span class="readout-unit">seconds</span>
+            </div>
+            <p class="readout-note">for sharp stars across the whole frame</p>
+
+            <dl class="stats">
+                <div><dt>Frame centre</dt><dd id="resCentre"></dd></div>
+                <div><dt>Simplified NPF</dt><dd id="resSimple"></dd></div>
+                <div><dt>500 rule</dt><dd id="res500"></dd></div>
+                <div><dt>Field of view</dt><dd id="resFov"></dd></div>
+                <div><dt>Declination</dt><dd id="resDec"></dd></div>
+            </dl>
+
+            <figure class="viewfinder-figure">
+                <div class="viewfinder" id="sensor">
+                    <img id="skyImage" alt="Sky behind the sensor" hidden>
+                    <div class="sensor-grid" id="sensorGrid"></div>
+                    <span class="corner tl"></span><span class="corner tr"></span>
+                    <span class="corner bl"></span><span class="corner br"></span>
+                    <p class="sensor-status" id="skyStatus"></p>
+                </div>
+                <figcaption>
+                    Each ninth of the frame, with its longest exposure and the declination at its centre.
+                    The marked cell sits closest to the celestial equator, so it sets the limit for the whole frame.
+                    The simplified NPF assumes a declination of about 60°; the 500 rule is shown for comparison only.
+                </figcaption>
+            </figure>
+        </div>
+    </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ asset('js/common.js') }}"></script>
+<script src="{{ asset('js/target-search.js') }}"></script>
+<script src="{{ asset('js/exposure.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{% endblock %} · Astrophotography Toolkit</title>
+    <script>
+        // Apply low-light mode before first paint so the page never flashes bright.
+        try { if (localStorage.getItem('astro-low-light') === '1') document.documentElement.dataset.mode = 'lowlight'; } catch (e) {}
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="{{ asset('css/site.css') }}">
+</head>
+<body>
+<header class="masthead">
+    <div class="wrap">
+        <div class="masthead-top">
+            <a class="site-title" href="{{ url_for('pages.index') }}">Astrophotography Toolkit</a>
+            <nav class="site-nav">
+                {% for endpoint, label in nav_items %}
+                <a href="{{ url_for(endpoint) }}"{% if request.endpoint == endpoint %} aria-current="page"{% endif %}>{{ label }}</a>
+                {% endfor %}
+                <button type="button" class="mode-toggle" id="modeToggle" aria-pressed="false"
+                        title="Red, dim interface that keeps your eyes dark-adapted">Low light</button>
+            </nav>
+        </div>
+        <div class="masthead-text">
+            <h1>{% block heading %}{% endblock %}</h1>
+            <p class="lede">{% block lede %}{% endblock %}</p>
+        </div>
+    </div>
+</header>
+
+<main class="wrap">
+    {% block content %}{% endblock %}
+</main>
+
+<footer class="site-footer">
+    <div class="wrap">
+        <p>
+            Made by Atharv Gogia
+            (<a href="https://www.linkedin.com/in/atharv-gogia/" target="_blank" rel="noopener">LinkedIn</a>,
+            <a href="https://github.com/Picklezoid" target="_blank" rel="noopener">GitHub</a>,
+            <a href="https://gatharv.artstation.com/" target="_blank" rel="noopener">ArtStation</a>)
+            and Kunal Krishna
+            (<a href="https://www.linkedin.com/in/kunal-krishna-927362325/" target="_blank" rel="noopener">LinkedIn</a>,
+            <a href="https://github.com/kunal12krishna" target="_blank" rel="noopener">GitHub</a>).
+        </p>
+    </div>
+</footer>
+<script src="{{ asset('js/mode.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

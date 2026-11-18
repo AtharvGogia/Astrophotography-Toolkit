@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Analyzer{% endblock %}
+{% block heading %}Image analyzer{% endblock %}
+{% block lede %}Upload a photo of the night sky to find out exactly where it points and what is in it:
+constellations, named stars, nebulae and galaxies.{% endblock %}
+{% block content %}
+<p class="notice">
+    Solving is currently done by <a href="https://nova.astrometry.net/" target="_blank" rel="noopener">astrometry.net</a>,
+    so your photo is uploaded there (marked private). A built-in solver that runs on your own computer is being worked on.
+</p>
+
+<form id="analyzeForm" class="upload-form" novalidate>
+    <div class="field">
+        <label for="imageUpload">Photo (JPG or PNG)</label>
+        <input type="file" id="imageUpload" accept="image/jpeg,image/png">
+    </div>
+    <button type="submit" id="analyzeBtn" class="primary">Analyze</button>
+    <p class="error" id="analyzerError" role="alert"></p>
+</form>
+
+<section id="progress" class="progress-block" hidden>
+    <p class="kicker">Progress</p>
+    <div class="progress-line">
+        <progress id="progressBar" value="0" max="100"></progress>
+        <span id="elapsed">0:00</span>
+    </div>
+    <ol class="log" id="log"></ol>
+</section>
+
+<section id="output" class="analysis" hidden>
+    <div class="analysis-cols">
+        <figure class="viewfinder-figure">
+            <div class="viewfinder photo">
+                <img id="annotatedImage" alt="Your photo with the identified objects labelled">
+                <span class="corner tl"></span><span class="corner tr"></span>
+                <span class="corner bl"></span><span class="corner br"></span>
+            </div>
+            <figcaption>Annotated by astrometry.net.</figcaption>
+        </figure>
+        <div>
+            <p class="kicker">In this photo</p>
+            <table class="object-table">
+                <thead><tr><th>Name</th><th>Also known as</th></tr></thead>
+                <tbody id="objectRows"></tbody>
+            </table>
+        </div>
+    </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="{{ asset('js/analyzer.js') }}"></script>
+{% endblock %}

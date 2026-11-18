@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Framing{% endblock %}
+{% block heading %}Framing{% endblock %}
+{% block lede %}See exactly what your camera and lens will capture, and how much room there is around
+your target, before you head out.{% endblock %}
+{% block content %}
+<div class="split">
+    <form id="framingForm" class="calc-form" novalidate>
+        {% set with_aperture = false %}
+        {% include "_camera_fields.html" %}
+        <button type="submit" id="previewBtn" class="primary">Show framing</button>
+        <p class="error" id="formError" role="alert"></p>
+    </form>
+
+    <section class="results" aria-live="polite">
+        <div id="resultsEmpty" class="empty">
+            <p class="kicker">Preview</p>
+            <p>Pick a target and your camera and lens, then press <em>Show framing</em>.</p>
+            <p class="muted">The sky is drawn from the built-in star catalog, with your frame outlined on it.
+            Rotation turns the frame the way it would turn on your camera.</p>
+        </div>
+
+        <div id="resultsBody" hidden>
+            <p class="kicker">Framing &middot; <span id="targetLabel"></span></p>
+            <dl class="stats">
+                <div><dt>Field of view</dt><dd id="resFov"></dd></div>
+                <div><dt>Diagonal</dt><dd id="resDiag"></dd></div>
+                <div><dt>Pixel scale</dt><dd id="resScale"></dd></div>
+                <div><dt>Centre RA</dt><dd id="resRA"></dd></div>
+                <div><dt>Centre Dec</dt><dd id="resDec"></dd></div>
+            </dl>
+
+            <figure class="viewfinder-figure">
+                <div class="viewfinder framing" id="framingView">
+                    <div class="clip">
+                        <img id="skyImage" alt="Sky around the target, with the camera frame outlined" hidden>
+                        <div class="fov-outline" id="fovOutline"><span>Your frame</span></div>
+                    </div>
+                    <div class="compass" aria-hidden="true"><span class="n">N</span><span class="e">E</span></div>
+                    <span class="corner tl"></span><span class="corner tr"></span>
+                    <span class="corner bl"></span><span class="corner br"></span>
+                    <p class="sensor-status" id="skyStatus"></p>
+                </div>
+                <figcaption id="framingCaption">
+                    North is up and east is to the left, as the sky looks when you face it.
+                </figcaption>
+            </figure>
+        </div>
+    </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ asset('js/common.js') }}"></script>
+<script src="{{ asset('js/target-search.js') }}"></script>
+<script src="{{ asset('js/framing.js') }}"></script>
+{% endblock %}

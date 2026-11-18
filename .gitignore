@@ -22,3 +22,9 @@ config.py
 
 # Local sample images (large)
 Samples/
+
+# Raw downloaded catalogs (rebuild trimmed copies with scripts/build_catalogs.py)
+catalog_raw/
+
+# Local Claude Code preview config
+.claude/

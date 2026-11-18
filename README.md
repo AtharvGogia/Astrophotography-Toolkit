@@ -1,33 +1,64 @@
-Astrophotography Toolkit (Work in Progress)-
-This is a web-based toolkit for astrophotographers. It includes an NPF exposure calculator with a skymap preview and an image analyzer powered by Astrometry.net.
+# Astrophotography Toolkit
 
-How It Works-
-The application runs as a local web server on your machine. The backend is built with Python (Flask) and uses libraries like Astropy and Reproject to handle astronomical calculations. The frontend is simple HTML, CSS, and JavaScript.
+A small web app for night-sky photographers, run locally on your own computer.
 
-The skymap preview feature works by intelligently loading and reprojecting sections from a high-resolution, tiled sky map to match your camera's field of view.
+- **Exposure**: the longest shutter time before stars trail, using Frédéric Michaud's NPF
+  rule. It also shows a 3 × 3 map of how the limit changes across your sensor, drawn over the
+  sky your camera will see.
+- **Framing**: your camera frame outlined on the real sky around a target, with field of view,
+  pixel scale and rotation.
+- **Analyzer**: upload a photo to find where it points and what is in it. It currently uses
+  astrometry.net; a built-in solver is in progress.
 
-Local Setup
-1. Skymap Tiles
-~~Download the skymapsplit folder and composite_skymap_16k.png from "https://drive.google.com/drive/folders/1rrDNBE-_NzLOH3oTllvlRFs0W_YL9cPu?usp=sharing" and place it in the root folder. (Optional for sensor visual representation)~~
-Download only the composite_skymap_16k.png from "https://drive.google.com/drive/folders/1rrDNBE-_NzLOH3oTllvlRFs0W_YL9cPu?usp=sharing" and place it in the root folder.(Optional for sensor visual representation)
+Target names autocomplete as you type, from built-in star and deep-sky catalogs (works offline).
+A red low-light mode keeps your eyes dark-adapted at the telescope.
 
-2. API Key
-The image analyzer requires a free API key from nova.astrometry.net. Either set the ASTROMETRY_API_KEY environment variable, or copy config.example.py to config.py and paste the key there. config.py is gitignored; never commit your key.
+## Setup
 
-3. Dependencies
-With Python and Pip installed, run the following in your project folder:
+Needs Python 3.10 or newer.
 
+```bash
 pip install -r requirements.txt
+python -m app
+```
 
-4. Run Server
-Finally, start the backend server:
+Then open <http://127.0.0.1:5000>. (`python backend.py` also still works.)
 
-python backend.py
+### Optional
 
-You can then access the toolkit at http://127.0.0.1:5000 in your browser.
+- **Analyzer key.** The analyzer needs a free API key from
+  [nova.astrometry.net](https://nova.astrometry.net/) (log in, then *My profile*). Either set the
+  `ASTROMETRY_API_KEY` environment variable or copy `config.example.py` to `config.py` and paste
+  the key there. `config.py` is gitignored: never commit your key.
+- **Skymap image.** Sky previews are drawn from the built-in star catalog. If you put a
+  `composite_skymap_16k.png` (an all-sky plate carrée image, RA 0h at the centre) in the project
+  folder, or point `SKYMAP_PATH` at one, it is used instead; that is useful for a map with
+  constellation art. The original one is in this
+  [Google Drive folder](https://drive.google.com/drive/folders/1rrDNBE-_NzLOH3oTllvlRFs0W_YL9cPu?usp=sharing).
+- **RAW files.** `pip install rawpy` adds CR2/NEF/ARW/… support to the image loader.
+- `FLASK_DEBUG=1` runs the server in debug mode (off by default).
 
-Optional environment variables:
-- SKYMAP_PATH: path to the skymap image (default: composite_skymap_16k.png in the project root)
-- FLASK_DEBUG=1: run Flask in debug mode (off by default)
+## Project layout
 
-The web frontend lives in static/; only that folder is served.
+```
+app/                Flask app (python -m app)
+  routes/           pages, calculator API, analyzer API
+  catalogs/         star and deep-sky catalogs, name search
+  skymap.py         sky previews (reprojection to your camera's view)
+  starfield.py      draws real star fields from the catalog
+  imageio.py        loads JPG/PNG/TIFF, FITS and RAW photos
+  templates/        HTML pages
+static/             CSS, JavaScript, camera presets, images
+scripts/            build_catalogs.py, render_masthead.py
+tests/              pytest suite: pip install -r requirements-dev.txt, then pytest
+```
+
+## Catalog data
+
+Star data comes from the [HYG Database](https://github.com/astronexus/HYG-Database) by David Nash,
+and deep-sky data from [OpenNGC](https://github.com/mattiaverga/OpenNGC) by Mattia Verga, both
+CC BY-SA 4.0. See `app/catalogs/data/ATTRIBUTION.md`. To rebuild the trimmed copies, download the
+originals into `catalog_raw/hyg/` and `catalog_raw/openngc/`, then run
+`python scripts/build_catalogs.py`.
+
+Made by Atharv Gogia & Kunal Krishna.

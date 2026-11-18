@@ -1,0 +1,13 @@
+[
+  {"name": "Canon EOS 6D",            "width_px": 5472, "height_px": 3648, "sensor_width_mm": 35.8, "sensor_height_mm": 23.9},
+  {"name": "Canon EOS R6",            "width_px": 5472, "height_px": 3648, "sensor_width_mm": 35.9, "sensor_height_mm": 23.9},
+  {"name": "Canon EOS 90D",           "width_px": 6960, "height_px": 4640, "sensor_width_mm": 22.3, "sensor_height_mm": 14.8},
+  {"name": "Canon EOS 2000D / Rebel T7", "width_px": 6000, "height_px": 4000, "sensor_width_mm": 22.3, "sensor_height_mm": 14.9},
+  {"name": "Nikon D750",              "width_px": 6016, "height_px": 4016, "sensor_width_mm": 35.9, "sensor_height_mm": 24.0},
+  {"name": "Nikon Z6 II",             "width_px": 6048, "height_px": 4024, "sensor_width_mm": 35.9, "sensor_height_mm": 23.9},
+  {"name": "Sony α7 III",             "width_px": 6000, "height_px": 4000, "sensor_width_mm": 35.6, "sensor_height_mm": 23.8},
+  {"name": "Sony α7 IV",              "width_px": 7008, "height_px": 4672, "sensor_width_mm": 35.9, "sensor_height_mm": 23.9},
+  {"name": "Sony α6400",              "width_px": 6000, "height_px": 4000, "sensor_width_mm": 23.5, "sensor_height_mm": 15.6},
+  {"name": "Fujifilm X-T4",           "width_px": 6240, "height_px": 4160, "sensor_width_mm": 23.5, "sensor_height_mm": 15.6},
+  {"name": "ZWO ASI2600MC Pro",       "width_px": 6248, "height_px": 4176, "sensor_width_mm": 23.5, "sensor_height_mm": 15.7}
+]
