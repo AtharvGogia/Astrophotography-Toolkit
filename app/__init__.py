@@ -10,10 +10,11 @@ def create_app(load_skymap=True):
     app = Flask(__name__, static_folder=settings.STATIC_DIR, static_url_path='/static')
     app.config['MAX_CONTENT_LENGTH'] = settings.MAX_UPLOAD_BYTES
 
-    from .routes import analyzer, calculator, pages
+    from .routes import analyzer, calculator, pages, planner
     app.register_blueprint(pages.bp)
     app.register_blueprint(calculator.bp)
     app.register_blueprint(analyzer.bp)
+    app.register_blueprint(planner.bp)
 
     if load_skymap:
         skymap.load()

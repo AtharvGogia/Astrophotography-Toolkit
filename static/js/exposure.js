@@ -2,7 +2,7 @@
 
 (() => {
     const $ = (id) => document.getElementById(id);
-    const FIELDS = ['latitude', 'longitude', 'cameraPreset', 'focalLength', 'aperture', 'pixelPitch',
+    const FIELDS = ['cameraPreset', 'focalLength', 'aperture', 'pixelPitch',
                     'rotation', 'sensorWidth', 'sensorHeight', 'targetName', 'customRA', 'customDec'];
 
     const num = (id) => { const v = $(id).value.trim(); return v === '' ? NaN : Number(v); };

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Planner{% endblock %}
+{% block heading %}Night planner{% endblock %}
+{% block lede %}Will your target clear the horizon tonight? When is it highest, where should you look,
+when is it properly dark, and what is the Moon doing?{% endblock %}
+{% block content %}
+<div class="split">
+    <form id="planForm" class="calc-form" novalidate>
+        <fieldset>
+            <legend>Where</legend>
+            <p class="loc-line"><span id="planLocation">No location set yet.</span>
+                <button type="button" class="link-button" id="changeLocation">Change</button></p>
+        </fieldset>
+
+        <fieldset>
+            <legend>Target</legend>
+            <div class="field combo">
+                <label for="targetName">Object</label>
+                <input type="text" id="targetName" placeholder="Search: Orion Nebula, M 31, Vega, Cygnus…"
+                       role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="targetList"
+                       autocomplete="off" spellcheck="false">
+                <ul class="combo-list" id="targetList" role="listbox" hidden></ul>
+                <p class="target-info" id="targetInfo"></p>
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>When</legend>
+            <div class="field-row">
+                <div class="field">
+                    <label for="planDate">Night of</label>
+                    <input type="date" id="planDate">
+                </div>
+                <div class="field">
+                    <label for="minAlt">Lowest useful altitude (°)</label>
+                    <input type="number" id="minAlt" min="0" max="80" step="1" value="30">
+                </div>
+            </div>
+            <p class="note">Below about 30° you look through a lot of air, haze and light pollution.
+            Lower it if you have a clear, dark horizon.</p>
+        </fieldset>
+
+        <button type="submit" id="planBtn" class="primary">Plan the night</button>
+        <p class="error" id="formError" role="alert"></p>
+    </form>
+
+    <section class="results" aria-live="polite">
+        <div id="resultsEmpty" class="empty">
+            <p class="kicker">Tonight</p>
+            <p>Set your location, pick a target and press <em>Plan the night</em>.</p>
+            <p class="muted">You'll see when it rises, peaks and sets, which way to face, the best dark window
+            above your chosen altitude, and where the Moon will be.</p>
+        </div>
+
+        <div id="resultsBody" hidden>
+            <p class="kicker" id="planTitle"></p>
+            <div class="readout readout-window">
+                <span class="readout-value" id="bestWindow"></span>
+            </div>
+            <p class="readout-note" id="planSummary"></p>
+
+            <dl class="stats" id="eventStats"></dl>
+
+        </div>
+    </section>
+</div>
+
+<section class="night-detail" id="nightDetail" hidden>
+    <figure class="chart-figure">
+        <svg id="altChart" class="alt-chart" viewBox="0 0 800 320" role="img"
+             aria-label="Altitude of the target and the Moon through the night"></svg>
+        <div class="chart-tip" id="chartTip" hidden></div>
+        <figcaption>
+            Altitude through the night. Shading goes from day through civil, nautical and astronomical
+            twilight to full darkness. The solid line is your target and the dashed line is the Moon;
+            the highlighted band is the best window. <span id="tzNote"></span>
+        </figcaption>
+    </figure>
+
+    <h2 class="section-head">Sun and Moon</h2>
+    <div class="sun-moon">
+        <table class="event-table" id="sunTable"><tbody></tbody></table>
+        <div class="moon-box">
+            <div class="moon-glyph" id="moonGlyph"></div>
+            <div>
+                <p class="moon-phase" id="moonPhase"></p>
+                <p class="muted" id="moonText"></p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="moon-cycle" id="moonCycle" hidden>
+    <h2 class="section-head">The next 30 nights</h2>
+    <div class="moon-strip" id="moonStrip"></div>
+    <p class="note" id="moonEvents"></p>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="{{ asset('js/common.js') }}"></script>
+<script src="{{ asset('js/target-search.js') }}"></script>
+<script src="{{ asset('js/planner.js') }}"></script>
+{% endblock %}

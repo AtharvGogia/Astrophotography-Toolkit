@@ -113,6 +113,44 @@ const Astro = (() => {
         } catch (e) { /* lines are decoration; the preview still works without them */ }
     }
 
+    // ---- Times and the Moon ---------------------------------------------------------------
+    const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
+    const dayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+    const fmtTime = (ms) => (ms == null ? '—' : timeFmt.format(new Date(ms)));
+    const fmtDay = (ms) => dayFmt.format(new Date(ms));
+    const timeZoneName = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    // Local noon of the night that is "tonight" now: before noon, that is still last night.
+    function nightStart(dateStr) {
+        let d;
+        if (dateStr) {
+            const [y, m, day] = dateStr.split('-').map(Number);
+            d = new Date(y, m - 1, day, 12, 0, 0);
+        } else {
+            const now = new Date();
+            d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
+            if (now.getHours() < 12) d.setDate(d.getDate() - 1);
+        }
+        return d;
+    }
+    const isoDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const utcIso = (d) => d.toISOString().replace('Z', '').split('.')[0];
+
+    // SVG of the Moon's lit shape (as seen from the northern hemisphere: waxing is lit on the right).
+    function moonSVG(illum, waxing, size = 44) {
+        const r = size / 2 - 1, c = size / 2;
+        const rx = Math.abs(2 * illum - 1) * r;
+        const right = waxing ? 1 : 0;                 // sweep flag for the lit limb
+        const gibbous = illum > 0.5;
+        const sweepBack = gibbous ? right : 1 - right;
+        const lit = illum < 0.005 ? '' : illum > 0.995
+            ? `<circle cx="${c}" cy="${c}" r="${r}" class="moon-lit"/>`
+            : `<path class="moon-lit" d="M ${c} ${c - r} A ${r} ${r} 0 0 ${right} ${c} ${c + r} A ${rx} ${r} 0 0 ${sweepBack} ${c} ${c - r} Z"/>`;
+        return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" aria-hidden="true">` +
+               `<circle cx="${c}" cy="${c}" r="${r}" class="moon-dark"/>${lit}</svg>`;
+    }
+
     return { toDeg, toRad, npfTime, npfSimple, rule500, sensorPointDec, fovDeg,
-             loadCameraPresets, restoreFields, saveFields, postJSON, drawSkyLines, loadSkyLines };
+             loadCameraPresets, restoreFields, saveFields, postJSON, drawSkyLines, loadSkyLines,
+             fmtTime, fmtDay, timeZoneName, nightStart, isoDate, utcIso, moonSVG };
 })();

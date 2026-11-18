@@ -1,12 +1,13 @@
 """HTML pages."""
 import os
 
-from flask import Blueprint, current_app, redirect, render_template, url_for
+from flask import Blueprint, current_app, render_template, url_for
 
 bp = Blueprint('pages', __name__)
 
 # (endpoint, label) in nav order. Only tools that work are listed.
-NAV = [('pages.exposure', 'Exposure'), ('pages.framing', 'Framing'), ('pages.analyzer', 'Analyzer')]
+NAV = [('pages.planner', 'Planner'), ('pages.exposure', 'Exposure'), ('pages.framing', 'Framing'),
+       ('pages.analyzer', 'Analyzer')]
 
 
 def asset(filename):
@@ -26,7 +27,12 @@ def inject_globals():
 
 @bp.get('/')
 def index():
-    return redirect(url_for('pages.exposure'))
+    return render_template('home.html')
+
+
+@bp.get('/planner')
+def planner():
+    return render_template('planner.html')
 
 
 @bp.get('/exposure')

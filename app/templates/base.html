@@ -22,6 +22,8 @@
                 {% for endpoint, label in nav_items %}
                 <a href="{{ url_for(endpoint) }}"{% if request.endpoint == endpoint %} aria-current="page"{% endif %}>{{ label }}</a>
                 {% endfor %}
+                <button type="button" class="location-button" id="locationButton" aria-haspopup="dialog"
+                        title="Where you are observing from">Set location</button>
                 <button type="button" class="mode-toggle" id="modeToggle" aria-pressed="false"
                         title="Red, dim interface that keeps your eyes dark-adapted">Low light</button>
             </nav>
@@ -50,7 +52,37 @@
         </p>
     </div>
 </footer>
+<dialog class="location-dialog" id="locationDialog" aria-labelledby="locationTitle">
+    <form method="dialog" id="locationForm" novalidate>
+        <h2 id="locationTitle">Observing location</h2>
+        <p class="muted">Used to work out when things rise and set and how high they get. It stays in this
+        browser and is never sent anywhere except this app on your computer.</p>
+        <button type="button" class="secondary" id="locateMe">Use my current location</button>
+        <p class="note" id="locateStatus" role="status"></p>
+        <p class="or">or enter it</p>
+        <div class="field">
+            <label for="locName">Name (optional)</label>
+            <input type="text" id="locName" placeholder="Backyard, dark site…" maxlength="40">
+        </div>
+        <div class="field-row">
+            <div class="field">
+                <label for="locLat">Latitude (°, north +)</label>
+                <input type="number" id="locLat" step="any" min="-90" max="90" placeholder="28.45">
+            </div>
+            <div class="field">
+                <label for="locLon">Longitude (°, east +)</label>
+                <input type="number" id="locLon" step="any" min="-180" max="180" placeholder="77.02">
+            </div>
+        </div>
+        <p class="error" id="locError" role="alert"></p>
+        <div class="dialog-actions">
+            <button type="button" class="secondary" id="locCancel">Cancel</button>
+            <button type="submit" class="primary" id="locSave">Save location</button>
+        </div>
+    </form>
+</dialog>
 <script src="{{ asset('js/mode.js') }}"></script>
+<script src="{{ asset('js/location.js') }}"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

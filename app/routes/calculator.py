@@ -26,7 +26,8 @@ def search_targets():
 @bp.post('/resolve')
 @bp.post('/get_declination')   # original name, kept for compatibility
 def resolve_target():
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    data = data if isinstance(data, dict) else {}
     try:
         coords = get_target_coords(data)
     except Exception as exc:
@@ -39,7 +40,8 @@ def _camera_request():
 
     Returns (params, None) or (None, error_response).
     """
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    data = data if isinstance(data, dict) else {}
     try:
         focal = float(data['focal_length'])
         width = int(data['sensor_width_px'])

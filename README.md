@@ -2,15 +2,22 @@
 
 A small web app for night-sky photographers, run locally on your own computer.
 
+- **Home**: tonight at a glance for your location: when it gets dark, the Moon, and the showpiece
+  objects that are best placed tonight.
+- **Planner**: whether a target clears the horizon on a given night, when it rises, peaks and sets,
+  which way to look, the best dark window above your chosen altitude, twilight times, and the Moon's
+  phase, rise and set, plus a 30-night Moon calendar with the next new and full Moons.
 - **Exposure**: the longest shutter time before stars trail, using Frédéric Michaud's NPF
   rule. It also shows a 3 × 3 map of how the limit changes across your sensor, drawn over the
   sky your camera will see.
 - **Framing**: your camera frame outlined on the real sky around a target, with field of view,
   pixel scale and rotation.
 - **Analyzer**: open a photo to find exactly where it points and what is in it. It plate-solves
-  the photo on your computer (no internet, no account) and labels named stars, nebulae, clusters,
-  galaxies and constellations, with an optional RA/Dec grid.
+  the photo on your computer (no internet, no account), draws the constellation figures and labels
+  named stars, nebulae, clusters and galaxies, with an optional RA/Dec grid.
 
+Your observing location is set once from the header ("Use my current location" asks the browser, or
+type coordinates). It is stored only in your browser. Times are shown in your computer's time zone.
 Target names autocomplete as you type, from built-in star and deep-sky catalogs (works offline).
 A red low-light mode keeps your eyes dark-adapted at the telescope.
 
@@ -47,6 +54,7 @@ app/                Flask app (python -m app)
   solver/           plate solver: star detection (sep), pattern matching (tetra3rs),
                     lens-distortion fit (TAN-SIP)
   annotate.py       labels for a solved photo: stars, deep-sky objects, constellations, grid
+  planner.py        twilight, rise/transit/set, best window, Moon phase and cycle (astropy)
   skymap.py         sky previews (reprojection to your camera's view)
   starfield.py      draws real star fields from the catalog
   imageio.py        loads JPG/PNG/TIFF, FITS and RAW photos

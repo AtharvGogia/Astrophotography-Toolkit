@@ -42,16 +42,18 @@ def _centroid(img, ch):
 
 # ---- Pages and security ------------------------------------------------------------
 
-@pytest.mark.parametrize('path', ['/exposure', '/framing', '/analyzer'])
+@pytest.mark.parametrize('path', ['/', '/planner', '/exposure', '/framing', '/analyzer'])
 def test_pages_render(client, path):
     resp = client.get(path)
     assert resp.status_code == 200
     assert b'Astrophotography Toolkit' in resp.data
 
 
-def test_index_redirects_to_exposure(client):
-    resp = client.get('/')
-    assert resp.status_code == 302 and resp.location.endswith('/exposure')
+def test_home_and_planner_pages(client):
+    home = client.get('/')
+    assert home.status_code == 200 and b'Tonight' in home.data
+    planner = client.get('/planner')
+    assert planner.status_code == 200 and b'Night planner' in planner.data
 
 
 @pytest.mark.parametrize('path', ['/config.py', '/backend.py', '/app/settings.py', '/static/../config.py',

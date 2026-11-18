@@ -6,20 +6,6 @@ Frédéric Michaud's NPF rule from your aperture, focal length, pixel size and t
 {% block content %}
 <div class="split">
     <form id="exposureForm" class="calc-form" novalidate>
-        <fieldset>
-            <legend>Location</legend>
-            <div class="field-row">
-                <div class="field">
-                    <label for="latitude">Latitude (°)</label>
-                    <input type="number" id="latitude" placeholder="28.45" step="any" min="-90" max="90">
-                </div>
-                <div class="field">
-                    <label for="longitude">Longitude (°)</label>
-                    <input type="number" id="longitude" placeholder="77.02" step="any" min="-180" max="180">
-                </div>
-            </div>
-        </fieldset>
-
         {% set with_aperture = true %}
         {% include "_camera_fields.html" %}
 
