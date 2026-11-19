@@ -153,27 +153,96 @@ const Astro = (() => {
     }
 
     // ---- Times and the Moon ---------------------------------------------------------------
-    const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
-    const dayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-    const fmtTime = (ms) => (ms == null ? '—' : timeFmt.format(new Date(ms)));
-    const fmtDay = (ms) => dayFmt.format(new Date(ms));
-    const timeZoneName = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-    // Local noon of the night that is "tonight" now: before noon, that is still last night.
-    function nightStart(dateStr) {
-        let d;
-        if (dateStr) {
-            const [y, m, day] = dateStr.split('-').map(Number);
-            d = new Date(y, m - 1, day, 12, 0, 0);
-        } else {
-            const now = new Date();
-            d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
-            if (now.getHours() < 12) d.setDate(d.getDate() - 1);
-        }
-        return d;
+    // Times show in the observing site's time zone (saved with the location), so a plan for a
+    // trip abroad reads in the times you'll see there. Without one, this device's zone is used.
+    const deviceZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+    function siteZone() {
+        try {
+            const loc = JSON.parse(localStorage.getItem('astro-location') || 'null');
+            if (loc && loc.tz) return loc.tz;
+        } catch (e) { /* storage blocked */ }
+        return null;
     }
-    const isoDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const timeZoneName = () => siteZone() || deviceZone();
+    const FORMATS = {
+        time: { hour: '2-digit', minute: '2-digit', hour12: false },
+        day: { weekday: 'short', day: 'numeric', month: 'short' },
+        parts: { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' },
+    };
+    const formatters = {};
+    function formatter(kind) {
+        const zone = timeZoneName(), key = `${kind}|${zone}`;
+        if (!formatters[key]) {
+            const locale = kind === 'parts' ? 'en-US' : undefined;
+            try { formatters[key] = new Intl.DateTimeFormat(locale, { ...FORMATS[kind], timeZone: zone }); }
+            catch (e) { formatters[key] = new Intl.DateTimeFormat(locale, FORMATS[kind]); }   // unknown zone name
+        }
+        return formatters[key];
+    }
+    const fmtTime = (ms) => (ms == null ? '—' : formatter('time').format(new Date(ms)));
+    const fmtDay = (ms) => formatter('day').format(new Date(ms));
+
+    // Calendar date and clock time of a moment, in the display zone.
+    function zoned(ms) {
+        const p = {};
+        for (const part of formatter('parts').formatToParts(new Date(ms))) p[part.type] = part.value;
+        return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour % 24, min: +p.minute, s: +p.second };
+    }
+    // The moment a wall-clock time (y, m 1-12, d, hour) happens in the display zone.
+    function zonedToMs(y, m, d, h) {
+        const want = Date.UTC(y, m - 1, d, h);
+        let t = want;
+        for (let i = 0; i < 3; i++) {
+            const z = zoned(t);
+            const diff = want - Date.UTC(z.y, z.m - 1, z.d, z.h, z.min, z.s);
+            if (!diff) break;
+            t += diff;
+        }
+        return t;
+    }
+
+    // Noon at the site on the night that is "tonight" now: before noon, that is still last night.
+    function nightStart(dateStr) {
+        let y, m, d;
+        if (dateStr) {
+            [y, m, d] = dateStr.split('-').map(Number);
+        } else {
+            const now = zoned(Date.now());
+            ({ y, m, d } = now);
+            if (now.h < 12) {
+                const prev = new Date(Date.UTC(y, m - 1, d) - 86400000);
+                [y, m, d] = [prev.getUTCFullYear(), prev.getUTCMonth() + 1, prev.getUTCDate()];
+            }
+        }
+        return new Date(zonedToMs(y, m, d, 12));
+    }
+    // The site's calendar date of a moment, as YYYY-MM-DD.
+    function isoDate(date) {
+        const z = zoned(date.getTime());
+        return `${z.y}-${String(z.m).padStart(2, '0')}-${String(z.d).padStart(2, '0')}`;
+    }
     const utcIso = (d) => d.toISOString().replace('Z', '').split('.')[0];
+
+    // ---- Offline: the last answers, kept for use in the field -----------------------------------
+    // Pages save their last good answer; when a request fails for want of a connection they show
+    // it again, with a note saying when it was saved.
+    const OFFLINE_KEY = 'astro-offline-';
+    const saved = {
+        put(kind, data) {
+            try { localStorage.setItem(OFFLINE_KEY + kind, JSON.stringify({ at: Date.now(), data })); } catch (e) { /* full or blocked */ }
+        },
+        get(kind) {
+            try { return JSON.parse(localStorage.getItem(OFFLINE_KEY + kind) || 'null'); } catch (e) { return null; }
+        },
+    };
+    // fetch() rejects with a TypeError when there is no connection (not for HTTP errors).
+    const isOffline = (err) => !navigator.onLine || err instanceof TypeError;
+    function offlineNote(el, at, what) {
+        if (!el) return;
+        if (at == null) { el.hidden = true; return; }
+        el.textContent = `No connection: showing the ${what} saved ${fmtDay(at)}, ${fmtTime(at)}.`;
+        el.hidden = false;
+    }
 
     // SVG of the Moon's lit shape (as seen from the northern hemisphere: waxing is lit on the right).
     function moonSVG(illum, waxing, size = 44) {
@@ -248,6 +317,6 @@ const Astro = (() => {
 
     return { motion, toDeg, toRad, npfTime, npfSimple, rule500, sensorPointDec, fovDeg,
              loadCameraPresets, restoreFields, saveFields, postJSON, drawSkyLines, loadSkyLines,
-             fmtTime, fmtDay, timeZoneName, nightStart, isoDate, utcIso, moonSVG, revealOnPhone,
+             fmtTime, fmtDay, timeZoneName, siteZone, deviceZone, zoned, zonedToMs, saved, isOffline, offlineNote, nightStart, isoDate, utcIso, moonSVG, revealOnPhone,
              linkTargetInputs, targetLabel };
 })();

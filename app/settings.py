@@ -34,3 +34,7 @@ MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 
 # Photo analyses allowed per visitor (IP) per 10 minutes; 0 = no limit.
 ANALYZE_PER_10_MIN = int(os.environ.get('ANALYZE_PER_10_MIN', '0'))
+
+# The site's public address (e.g. https://astro.atharvgogia.in), for link previews and the
+# canonical URL. Empty: use the address the request came in on.
+PUBLIC_URL = os.environ.get('PUBLIC_URL', '').rstrip('/')

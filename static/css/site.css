@@ -557,6 +557,15 @@ code { font-family: var(--mono); font-size: 0.9em; color: var(--text-dim); }
 .layer:hover, .layer-fg:hover { color: var(--text); }
 /* Set apart from the layer switches: it reveals parts of every layer, not a layer of its own. */
 .layer-fg { margin-left: 12px; border-style: dashed; }
+/* Saving the image is an action, not a layer: pushed to the far end of the bar. */
+.layer-save {
+    margin-left: auto; height: 32px; padding: 0 14px;
+    border: 1px solid var(--accent); background: transparent; color: var(--text);
+    font: 500 var(--fs-meta) var(--sans); letter-spacing: 0.03em; cursor: pointer;
+}
+.layer-save:hover:not(:disabled) { background: var(--accent-fill); color: var(--accent-ink); }
+.layer-save:disabled { opacity: 0.6; cursor: progress; }
+.layer-save:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .layer-fg[hidden] { display: none; }
 
 /* Lines and labels over the foreground (where the photo shows no stars): hidden unless asked
@@ -922,7 +931,7 @@ html { scrollbar-color: var(--rule) var(--bg); }
 
 @media (pointer: coarse) {
     input[type="text"], input[type="number"], input[type="date"], select { height: 44px; font-size: 16px; }
-    .mode-toggle, .location-button, .layer, .layer-fg { min-height: 44px; }
+    .mode-toggle, .location-button, .layer, .layer-fg, .layer-save { min-height: 44px; }
     button.primary { height: 48px; }
     .site-nav a { padding-top: 12px; padding-bottom: 12px; }
     .link-button { padding: 10px 0; margin: -10px 0; }
@@ -1085,3 +1094,12 @@ button.primary:active:not(:disabled) { transform: scale(0.98); }
 .masthead { view-transition-name: masthead; }
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 180ms; }
 @media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
+
+/* Offline: a saved answer is on screen. Plain and visible, not alarming. */
+.offline-note {
+    margin: 0.8rem 0 0; padding: 8px 12px;
+    border-left: 2px solid var(--c-moonless-line); background: var(--bg-raise);
+    font-size: var(--fs-ui); color: var(--text-dim);
+}
+.offline-note[hidden] { display: none; }
+:root[data-mode="lowlight"] .offline-note { border-left-color: var(--accent); }

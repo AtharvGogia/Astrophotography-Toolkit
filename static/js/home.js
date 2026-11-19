@@ -15,19 +15,29 @@
             $('tonightBody').hidden = true;
             return;
         }
-        const start = Astro.nightStart();
-        let data;
+        let start = Astro.nightStart();
+        let data, savedAt = null;
         try {
             const resp = await Astro.postJSON('/api/tonight', { lat: loc.lat, lon: loc.lon, start: Astro.utcIso(start) });
             data = await resp.json();
             if (!resp.ok) throw new Error(data.error || 'Could not work out tonight.');
+            Astro.saved.put('tonight', { lat: loc.lat, lon: loc.lon, start: start.getTime(), data });
         } catch (err) {
-            $('tonightError').textContent = err.message;
-            return;
+            const keep = Astro.saved.get('tonight');
+            if (!(Astro.isOffline(err) && keep && keep.data.lat === loc.lat && keep.data.lon === loc.lon)) {
+                $('tonightError').textContent = err.message;
+                return;
+            }
+            data = keep.data.data;
+            start = new Date(keep.data.start);
+            savedAt = keep.at;
         }
+        Astro.offlineNote($('offlineNote'), savedAt, 'answer');
 
         const illum = data.moon.illumination, pct = Math.round(illum * 100);
-        $('homeWhere').textContent = `${ObserverLocation.format(loc)} · night of ${Astro.fmtDay(start.getTime())}`;
+        const zone = Astro.siteZone();
+        $('homeWhere').textContent = `${ObserverLocation.format(loc)} · night of ${Astro.fmtDay(start.getTime())}` +
+            (zone && zone !== Astro.deviceZone() ? ` · times local to the site (${zone})` : '');
         // Prefer the exact twilight crossings (as listed in the timeline) over 5-minute samples.
         const ev = data.sun_events, kind = data.dark_kind === 'astronomical' ? 'astronomical' : 'nautical';
         const dStart = ev[`${kind}_set`] || data.dark_start, dEnd = ev[`${kind}_rise`] || data.dark_end;

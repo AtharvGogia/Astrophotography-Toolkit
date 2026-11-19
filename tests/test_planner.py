@@ -124,3 +124,22 @@ def test_sky_chart_endpoint(client):
 def test_plan_returns_target_position(client):
     r = client.post('/api/plan', json={'lat': 28.45, 'lon': 77.02, 'start': '2026-11-18T06:30:00', 'ra': 83.82, 'dec': -5.39})
     assert r.get_json()['target'] == {'ra': 83.82, 'dec': -5.39}
+
+
+def test_timezone_lookup(client):
+    assert client.get('/api/timezone?lat=31.96&lon=-111.6').get_json()['tz'] == 'America/Phoenix'
+    assert client.get('/api/timezone?lat=12.82&lon=80.04').get_json()['tz'] == 'Asia/Kolkata'
+    assert client.get('/api/timezone?lat=95&lon=0').status_code == 400
+
+
+def test_place_search(client):
+    top = client.get('/api/places?q=tucson&limit=3').get_json()[0]
+    assert (top['name'], top['region'], top['tz']) == ('Tucson', 'Arizona', 'America/Phoenix')
+    assert abs(top['lat'] - 32.22) < 0.05 and abs(top['lon'] + 110.93) < 0.05
+    # A comma narrows by region or country, including US state codes.
+    assert client.get('/api/places?q=paris, tx').get_json()[0]['region'] == 'Texas'
+    assert client.get('/api/places?q=paris, france').get_json()[0]['country'] == 'France'
+    # Accents fold: "sao paulo" finds São Paulo.
+    assert client.get('/api/places?q=sao paulo').get_json()[0]['name'] == 'São Paulo'
+    assert client.get('/api/places?q=').get_json() == []
+    assert len(client.get('/api/places?q=san&limit=5').get_json()) == 5

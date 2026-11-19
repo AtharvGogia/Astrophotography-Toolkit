@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Analyzer{% endblock %}
+{% block description %}Upload a night-sky photo to find where it points and what is in it: constellations, named stars, nebulae, clusters and galaxies.{% endblock %}
 {% block heading %}Image analyzer{% endblock %}
 {% block lede %}Find out exactly where a night-sky photo points and what is in it: constellations,
 named stars, nebulae, clusters and galaxies. {% if hosted %}Your photo is solved on this site's server and is not kept afterwards.{% else %}Everything runs on your computer; nothing is uploaded anywhere.{% endif %}{% endblock %}
@@ -61,6 +62,8 @@ named stars, nebulae, clusters and galaxies. {% if hosted %}Your photo is solved
                     <button type="button" class="layer" data-layer="grid" aria-pressed="false">RA/Dec grid</button>
                     <button type="button" class="layer-fg" id="fgToggle" aria-pressed="false" hidden
                             title="Also show lines and labels over the landscape, where the photo shows no stars">Over foreground</button>
+                    <button type="button" class="layer-save" id="downloadBtn"
+                            title="Save the photo with the labels you have switched on, as a PNG">Download image</button>
                 </div>
                 <div class="answer-panel solution-panel">
                     <p class="kicker">Where it points</p>

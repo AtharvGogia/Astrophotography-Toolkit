@@ -85,3 +85,31 @@ def sky_chart():
     resp = jsonify(skychart.sky_chart(round(lat, 2), round(lon, 2), start))
     resp.headers['Cache-Control'] = 'private, max-age=3600'
     return resp
+
+
+@bp.get('/timezone')
+def timezone():
+    """The time zone at a place (IANA name, e.g. "America/Phoenix"), looked up offline."""
+    try:
+        lat = _num(request.args, 'lat', -90, 90)
+        lon = _num(request.args, 'lon', -180, 180)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    from tzfpy import get_tz
+    resp = jsonify({'tz': get_tz(lon, lat) or 'UTC'})
+    resp.headers['Cache-Control'] = 'public, max-age=604800'
+    return resp
+
+
+@bp.get('/places')
+def search_places():
+    """Suggestions for the location box: ?q=tucson -> [{label, name, region, country, lat, lon, tz}]."""
+    from ..catalogs import places
+    q = request.args.get('q', '')[:80]
+    try:
+        limit = max(1, min(int(request.args.get('limit', 8)), 20))
+    except ValueError:
+        limit = 8
+    resp = jsonify([p.to_dict() for p in places.search(q, limit)])
+    resp.headers['Cache-Control'] = 'public, max-age=86400'
+    return resp

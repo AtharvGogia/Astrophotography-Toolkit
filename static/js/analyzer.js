@@ -192,6 +192,56 @@
         });
     }
 
+    // ---- Download: the photo with its labels, as one PNG --------------------------------------
+    // The overlay is styled by the site's CSS, which an exported SVG can't see, so each element's
+    // computed style is copied onto a clone first. The image shows the layers switched on now.
+    const EXPORT_STYLES = ['display', 'visibility', 'opacity', 'fill', 'fill-opacity', 'stroke', 'stroke-opacity',
+        'stroke-width', 'stroke-dasharray', 'stroke-linejoin', 'stroke-linecap', 'paint-order', 'font-family',
+        'font-size', 'font-weight', 'font-style', 'letter-spacing', 'text-anchor', 'dominant-baseline'];
+    let lastFilename = 'photo';
+
+    async function downloadAnnotated() {
+        const img = $('photo'), svg = $('overlay');
+        for (const anim of svg.getAnimations({ subtree: true })) anim.finish();   // no half-drawn lines
+        const w = img.naturalWidth, h = img.naturalHeight;
+        const clone = svg.cloneNode(true);
+        const from = [svg, ...svg.querySelectorAll('*')], to = [clone, ...clone.querySelectorAll('*')];
+        from.forEach((node, i) => {
+            const cs = getComputedStyle(node);
+            to[i].setAttribute('style', EXPORT_STYLES.map((p) => `${p}:${cs.getPropertyValue(p)}`).join(';'));
+            to[i].removeAttribute('class');
+        });
+        clone.setAttribute('xmlns', SVG);
+        clone.setAttribute('width', w);
+        clone.setAttribute('height', h);
+        const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(clone)], { type: 'image/svg+xml' }));
+        try {
+            const labels = new Image();
+            labels.src = url;
+            await labels.decode();
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            ctx.drawImage(labels, 0, 0, w, h);
+            const blob = await new Promise((ok) => canvas.toBlob(ok, 'image/png'));
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `${lastFilename.replace(/\.[^.]+$/, '')}-annotated.png`;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+        } finally {
+            URL.revokeObjectURL(url);
+        }
+    }
+    $('downloadBtn').addEventListener('click', async () => {
+        const btn = $('downloadBtn');
+        btn.disabled = true;
+        try { await downloadAnnotated(); }
+        catch (err) { $('analyzerError').textContent = 'The image could not be saved: ' + err.message; }
+        finally { btn.disabled = false; }
+    });
+
     // ---- Results -----------------------------------------------------------------------
     function showResult(res) {
         const s = res.solution, a = res.annotations;
@@ -236,6 +286,7 @@
             `${res.filename}. Labels come from the HYG and OpenNGC catalogs, placed using the solved position` +
             `${s.parity_flipped ? ' (the photo appears mirrored)' : ''}.`;
         drawOverlay(a);
+        lastFilename = res.filename || 'photo';
         $('output').hidden = false;
         Astro.revealOnPhone($('output'));
     }

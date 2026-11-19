@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Tonight{% endblock %}
+{% block description %}Tonight at a glance for your location: when it gets properly dark, what the Moon is doing, and the best objects to photograph.{% endblock %}
 {% block heading %}Tonight{% endblock %}
 {% block lede %}<span id="homeWhere">Real star catalogs, worked out for where you are{% if not hosted %}, on your own computer{% endif %}.</span>{% endblock %}
 {% block content %}
@@ -42,6 +43,7 @@
         </div>
     </div>
     <p class="error" id="tonightError" role="alert"></p>
+    <p class="offline-note" id="offlineNote" role="status" hidden></p>
 </section>
 {% endblock %}
 {% block scripts %}

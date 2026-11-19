@@ -23,3 +23,14 @@ to decimal degrees, NGC/IC identifiers reformatted (`NGC0224` → `NGC 224`).
 Olaf Frohn, <https://github.com/ofrohn/d3-celestial> (`data/constellations.lines.json`),
 copied unchanged. It is under the BSD 3-Clause licence; the full licence text is in
 `LICENSE-d3-celestial.txt`.
+
+## Places (CC BY 4.0)
+
+`places.csv.gz` lists cities and towns with 5,000 or more people from **GeoNames**,
+<https://www.geonames.org/> (`cities5000.zip`, `admin1CodesASCII.txt` and `countryInfo.txt`
+from <https://download.geonames.org/export/dump/>), licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
+Changes made: columns reduced to name, region, country, coordinates (rounded to 4 decimals),
+population and time zone; search keys (accent-folded names and words) added by
+`scripts/build_catalogs.py`.

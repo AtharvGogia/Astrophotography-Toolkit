@@ -5,10 +5,23 @@
 substitutions:
   _REGION: asia-south1
   _SERVICE: astro-toolkit
+  _PUBLIC_URL: https://astro.atharvgogia.in
   _IMAGE: asia-south1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/astro-toolkit
 
 steps:
+  # The test suite gates the deploy: if it fails, the build stops and the live site stays on the
+  # last good revision.
+  - id: test
+    name: python:3.12-slim
+    entrypoint: bash
+    args:
+      - -c
+      - pip install --quiet --no-cache-dir -r requirements-dev.txt && python -m pytest -q
+    env:
+      - PIP_DISABLE_PIP_VERSION_CHECK=1
+
   - id: build
+    waitFor: ["test"]
     name: gcr.io/cloud-builders/docker
     args: ["build", "-t", "${_IMAGE}:${SHORT_SHA}", "-t", "${_IMAGE}:latest", "."]
 
@@ -33,6 +46,7 @@ steps:
       - --max-instances=1
       - --timeout=120
       - --cpu-boost
+      - --update-env-vars=PUBLIC_URL=${_PUBLIC_URL}
 
 images:
   - ${_IMAGE}:${SHORT_SHA}

@@ -4,6 +4,8 @@ scipy>=1.11
 astropy>=6.0
 reproject>=0.13
 Pillow>=10.0
+# Time zone of the observing site, from its coordinates (offline lookup)
+tzfpy>=2.1
 # Plate solving: star detection and pattern matching (tetra3rs brings the Gaia star catalog)
 sep>=1.4
 tetra3rs>=0.14

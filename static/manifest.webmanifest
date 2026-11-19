@@ -1,0 +1,16 @@
+{
+  "name": "Astrophotography Toolkit",
+  "short_name": "Astro Toolkit",
+  "description": "Plan the night, work out your exposure, check your framing, and solve your night-sky photos.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#100e0b",
+  "theme_color": "#100e0b",
+  "icons": [
+    { "src": "/static/img/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/img/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/static/img/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/static/img/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

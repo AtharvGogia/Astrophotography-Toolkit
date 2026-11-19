@@ -100,6 +100,7 @@ The image sets these (see `app/settings.py`):
 | `WARMUP_SYNC` | `1` | Catalogs, sky map and solver index load before the first request is served. |
 | `MAX_UPLOAD_MB` | `30` | Cloud Run accepts requests up to 32 MiB. The page shrinks big JPG/PNG files before upload. |
 | `ANALYZE_PER_10_MIN` | `20` | Photo analyses per visitor per 10 minutes. |
+| `PUBLIC_URL` | set by `cloudbuild.yaml` | The site's address for link previews (`og:image`, canonical URL). |
 
 Uploaded photos are processed in memory and dropped as soon as the answer is sent.
 

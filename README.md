@@ -146,8 +146,9 @@ PRODUCT.md          who the toolkit is for and the principles behind its design
 Star data comes from the [HYG Database](https://github.com/astronexus/HYG-Database) by David Nash,
 and deep-sky data from [OpenNGC](https://github.com/mattiaverga/OpenNGC) by Mattia Verga, both
 CC BY-SA 4.0. Constellation figures are from [d3-celestial](https://github.com/ofrohn/d3-celestial)
-by Olaf Frohn (BSD 3-Clause). See `app/catalogs/data/ATTRIBUTION.md`. To rebuild the trimmed copies,
-download the originals into `catalog_raw/hyg/` and `catalog_raw/openngc/`, then run
+by Olaf Frohn (BSD 3-Clause). Town and city search uses [GeoNames](https://www.geonames.org/)
+(CC BY 4.0). See `app/catalogs/data/ATTRIBUTION.md`. To rebuild the trimmed copies,
+download the originals into `catalog_raw/hyg/`, `catalog_raw/openngc/` and `catalog_raw/geonames/`, then run
 `python scripts/build_catalogs.py`.
 
 Plate solving uses [tetra3rs](https://github.com/ssmichael1/tetra3rs) (MIT) and its bundled star

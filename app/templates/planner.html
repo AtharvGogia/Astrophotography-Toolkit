@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Planner{% endblock %}
+{% block description %}Will your target clear the horizon tonight? Rise, peak and set times, the best moonless window, an all-sky chart and a 30-night Moon calendar.{% endblock %}
 {% block heading %}Night planner{% endblock %}
 {% block lede %}Will your target clear the horizon tonight? When is it highest, where should you look,
 when is it properly dark, and what is the Moon doing?{% endblock %}
@@ -42,6 +43,7 @@ when is it properly dark, and what is the Moon doing?{% endblock %}
 
         <button type="submit" id="planBtn" class="primary">Plan the night</button>
         <p class="error" id="formError" role="alert"></p>
+        <p class="offline-note" id="offlineNote" role="status" hidden></p>
     </form>
 
     <section class="results" aria-live="polite">

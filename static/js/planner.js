@@ -95,10 +95,10 @@
         svg.appendChild(el('text', { x: W - R - 4, y: y(p.min_alt) - 5, class: 'axis-label', 'text-anchor': 'end' },
                            `your minimum, ${p.min_alt}°`));
         // Hour ticks.
-        const firstHour = Math.ceil(t0 / 3600000) * 3600000;
-        for (let t = firstHour; t <= t1; t += 3600000) {
-            const d = new Date(t);
-            if (d.getHours() % 2) continue;
+        const firstQuarter = Math.ceil(t0 / 900000) * 900000;
+        for (let t = firstQuarter; t <= t1; t += 900000) {
+            const z = Astro.zoned(t);
+            if (z.min !== 0 || z.h % 2) continue;
             svg.appendChild(el('line', { x1: x(t), x2: x(t), y1: H - B, y2: H - B + 4, class: 'tick' }));
             svg.appendChild(el('text', { x: x(t), y: H - B + 18, class: 'axis-label', 'text-anchor': 'middle' }, fmtTime(t)));
         }
@@ -250,7 +250,9 @@
         const mr = p.moon.events.find((e) => e.event === 'rise'), ms = p.moon.events.find((e) => e.event === 'set');
         $('moonText').textContent = `${mr ? `Rises ${fmtTime(mr.time)}` : 'No moonrise in this window'}` +
             `${ms ? `, sets ${fmtTime(ms.time)}` : ''}. ${p.moon.separation}° from your target.`;
-        $('tzNote').textContent = `Times are in your computer's time zone (${Astro.timeZoneName()}).`;
+        $('tzNote').textContent = Astro.siteZone()
+            ? `Times are local to the observing site (${Astro.siteZone()}).`
+            : `Times are in your computer's time zone (${Astro.deviceZone()}).`;
 
         drawChart(p, true);
         lastPlan = { p, name, loc };
@@ -417,9 +419,15 @@
                 const data = await resp.json();
                 if (sky.key !== key) return;            // a newer plan replaced this one
                 sky.data = data;
+                Astro.saved.put('sky', { key, data });
             } catch (e) {
-                $('skyPanel').hidden = true;
-                return;
+                const keep = Astro.saved.get('sky');
+                if (keep && keep.data.key === key) {
+                    sky.data = keep.data.data;          // offline: the chart saved with this plan
+                } else {
+                    $('skyPanel').hidden = true;
+                    return;
+                }
             }
         }
         $('skyPanel').hidden = false;
@@ -448,16 +456,24 @@
     $('planDate').addEventListener('change', markPlannedNight);
 
     async function loadMoonCycle() {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const now = Astro.zoned(Date.now());
+        const today = new Date(Astro.zonedToMs(now.y, now.m, now.d, 0));   // midnight at the site
         try {
-            const resp = await fetch(`/api/moon?start=${encodeURIComponent(Astro.utcIso(today))}&days=30`);
-            if (!resp.ok) return;
-            const data = await resp.json();
+            let data;
+            try {
+                const resp = await fetch(`/api/moon?start=${encodeURIComponent(Astro.utcIso(today))}&days=30`);
+                if (!resp.ok) return;
+                data = await resp.json();
+                Astro.saved.put('moon', data);
+            } catch (err) {
+                const keep = Astro.saved.get('moon');
+                if (!keep) return;
+                data = keep.data;                       // offline: the last 30 nights saved
+            }
             const strip = $('moonStrip');
             strip.innerHTML = '';
             const eventsByDay = {};
-            for (const e of data.events) eventsByDay[new Date(e.time).toDateString()] = e.event;
+            for (const e of data.events) eventsByDay[Astro.isoDate(new Date(e.time))] = e.event;
             for (const d of data.days) {
                 // Label each sample by the local date at midday, so a daylight-saving change
                 // (a 23 or 25 hour day) can't shift it onto the neighbouring date.
@@ -474,14 +490,14 @@
                     markPlannedNight();
                     $('planForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
                 });
-                const ev = eventsByDay[date.toDateString()];
+                const ev = eventsByDay[Astro.isoDate(date)];
                 if (ev) cell.classList.add('moon-day-event');
                 const label = `${fmtDay(date.getTime())}: Moon ${Math.round(d.illumination * 100)}% lit${ev ? `, ${ev}` : ''}` +
                               `${d.illumination < 0.3 ? ', a dark night' : ''}. Plan this night`;
                 cell.title = label;
                 cell.setAttribute('aria-label', label);
                 cell.innerHTML = Astro.moonSVG(d.illumination, d.waxing, 26) +
-                    `<span class="moon-date">${date.getDate()}</span>`;
+                    `<span class="moon-date">${Astro.zoned(date.getTime()).d}</span>`;
                 strip.appendChild(cell);
             }
             $('moonEvents').textContent = data.events.slice(0, 4)
@@ -519,9 +535,17 @@
             });
             const data = await resp.json();
             if (!resp.ok) throw new Error(data.error || 'Planning failed.');
+            Astro.offlineNote($('offlineNote'), null);
+            Astro.saved.put('plan', { data, name, loc });
             render(data, name, loc);
         } catch (err) {
-            $('formError').textContent = err.message;
+            const keep = Astro.saved.get('plan');
+            if (Astro.isOffline(err) && keep) {
+                Astro.offlineNote($('offlineNote'), keep.at, `plan for ${keep.data.name}`);
+                render(keep.data.data, keep.data.name, keep.data.loc);
+            } else {
+                $('formError').textContent = err.message;
+            }
         } finally {
             btn.disabled = false;
             btn.textContent = 'Plan the night';

@@ -43,6 +43,9 @@ def create_app(load_skymap=True):
         if load_skymap:
             skymap.load()
         threading.Thread(target=catalogs.targets, daemon=True).start()
+        # The place list (location search) loads on first use when hosted, to keep cold starts short.
+        from .catalogs import places
+        threading.Thread(target=places.warm, daemon=True).start()
         if load_skymap:
             from .solver import index
             threading.Thread(target=index.get, daemon=True).start()
