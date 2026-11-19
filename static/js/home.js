@@ -26,6 +26,8 @@
             const keep = Astro.saved.get('tonight');
             if (!(Astro.isOffline(err) && keep && keep.data.lat === loc.lat && keep.data.lon === loc.lon)) {
                 $('tonightError').textContent = err.message;
+                $('tonightBody').hidden = true;         // don't leave another place's answer showing
+                Astro.offlineNote($('offlineNote'), null);
                 return;
             }
             data = keep.data.data;

@@ -143,3 +143,11 @@ def test_place_search(client):
     assert client.get('/api/places?q=sao paulo').get_json()[0]['name'] == 'São Paulo'
     assert client.get('/api/places?q=').get_json() == []
     assert len(client.get('/api/places?q=san&limit=5').get_json()) == 5
+
+
+def test_place_search_full_label():
+    from app.catalogs import places
+    # The label shown after picking a place, and several comma parts, still find it.
+    assert places.search('Tucson, Arizona, United States')[0].name == 'Tucson'
+    assert places.search('paris, tx, usa')[0].region == 'Texas'
+    assert places.search('paris, tx, france') == []

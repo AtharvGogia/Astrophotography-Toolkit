@@ -7,7 +7,7 @@
 // - API requests are left alone; the pages fall back to their saved answers themselves.
 'use strict';
 
-const CACHE = 'astro-toolkit-v1';
+const CACHE = 'astro-toolkit-v2';
 const PAGES = ['/', '/planner', '/exposure', '/framing', '/analyzer'];
 const PAGE_WAIT_MS = 6000;
 
@@ -15,7 +15,8 @@ const PAGE_WAIT_MS = 6000;
 self.addEventListener('install', (event) => {
     event.waitUntil((async () => {
         const cache = await caches.open(CACHE);
-        const assets = new Set(['/manifest.webmanifest', '/favicon.ico']);
+        // The camera list is fetched by script, so it is not in any page's HTML: name it here.
+        const assets = new Set(['/manifest.webmanifest', '/favicon.ico', '/static/data/cameras.json']);
         for (const page of PAGES) {
             try {
                 const resp = await fetch(page, { cache: 'no-store' });
@@ -68,31 +69,42 @@ async function cacheFirst(request) {
     const keep = await cache.match(request);
     if (keep) return keep;
     const resp = await fetch(request);
-    if (resp.ok || resp.type === 'opaque') cache.put(request, resp.clone());
+    if (resp.ok) {
+        // A new version of a file replaces the old one, so the cache does not grow with every release.
+        const path = new URL(request.url).pathname;
+        for (const old of await cache.keys()) {
+            if (new URL(old.url).pathname === path) await cache.delete(old);
+        }
+        await cache.put(request, resp.clone());
+    }
     return resp;
 }
 
-async function staleWhileRevalidate(request) {
+async function staleWhileRevalidate(event) {
+    const request = event.request;
     const cache = await caches.open(CACHE);
     const keep = await cache.match(request);
-    const fresh = fetch(request).then((resp) => {
-        if (resp.ok || resp.type === 'opaque') cache.put(request, resp.clone());
+    const fresh = fetch(request).then(async (resp) => {
+        if (resp.ok || resp.type === 'opaque') await cache.put(request, resp.clone());
         return resp;
-    }).catch(() => keep);
-    return keep || fresh;
+    });
+    // Keep the worker alive until the refreshed copy is saved.
+    event.waitUntil(fresh.catch(() => {}));
+    if (keep) return keep;
+    return fresh;                              // nothing saved yet: the network answer, or its error
 }
 
 self.addEventListener('fetch', (event) => {
     const req = event.request;
     if (req.method !== 'GET') return;
     const url = new URL(req.url);
-    if (req.mode === 'navigate' && url.origin === self.location.origin) {
+    if (req.mode === 'navigate' && url.origin === self.location.origin && !url.pathname.startsWith('/api/')) {
         event.respondWith(page(req));
     } else if (url.origin === self.location.origin && (url.pathname.startsWith('/static/')
                || url.pathname === '/manifest.webmanifest' || url.pathname === '/favicon.ico')) {
         // Versioned URLs (?v=) never change, so the cache is enough; others refresh in the background.
-        event.respondWith(url.searchParams.has('v') ? cacheFirst(req) : staleWhileRevalidate(req));
+        event.respondWith(url.searchParams.has('v') ? cacheFirst(req) : staleWhileRevalidate(event));
     } else if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
-        event.respondWith(staleWhileRevalidate(req));
+        event.respondWith(staleWhileRevalidate(event));
     }
 });

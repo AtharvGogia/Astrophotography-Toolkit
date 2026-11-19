@@ -22,16 +22,23 @@ const ObserverLocation = (() => {
     }
 
     // The time zone at the site (e.g. "America/Phoenix"), so times show as they will there.
+    // Gives up after a few seconds so a dead field connection never holds up saving.
     async function lookUpZone(loc) {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 4000);
         try {
-            const resp = await fetch(`/api/timezone?lat=${loc.lat}&lon=${loc.lon}`);
+            const resp = await fetch(`/api/timezone?lat=${loc.lat}&lon=${loc.lon}`, { signal: ctrl.signal });
             if (resp.ok) return (await resp.json()).tz || null;
-        } catch (e) { /* offline: fall back to this device's zone */ }
+        } catch (e) { /* offline or too slow: fall back to this device's zone */ }
+        finally { clearTimeout(t); }
         return null;
     }
 
+    let saveSeq = 0;
     async function set(loc) {
+        const mine = ++saveSeq;
         const tz = loc.tz || await lookUpZone(loc);
+        if (mine !== saveSeq) return;          // a newer location was saved while this one looked up its zone
         loc = tz ? { ...loc, tz } : { ...loc };
         if (!tz) delete loc.tz;
         try { localStorage.setItem(KEY, JSON.stringify(loc)); } catch (e) { /* ignore */ }
@@ -67,6 +74,8 @@ const ObserverLocation = (() => {
     let picked = null, results = [], active = -1, seq = 0, timer = 0;
 
     function closeList() {
+        clearTimeout(timer);
+        seq++;                                 // a search still on its way must not reopen the list
         const list = $('locList');
         list.hidden = true;
         list.innerHTML = '';
@@ -112,8 +121,9 @@ const ObserverLocation = (() => {
         if (!q) { closeList(); return; }
         try {
             const resp = await fetch(`/api/places?q=${encodeURIComponent(q)}&limit=8`);
+            const found = resp.ok ? await resp.json() : [];
             if (mine !== seq) return;
-            results = resp.ok ? await resp.json() : [];
+            results = found;
             active = results.length ? 0 : -1;
             renderList(results.length ? '' : 'No town or city by that name. Enter coordinates below.');
         } catch (e) {
@@ -143,7 +153,10 @@ const ObserverLocation = (() => {
         // A location saved before time zones were kept: look its zone up once.
         const saved = get();
         if (saved && !saved.tz) {
-            lookUpZone(saved).then((tz) => { if (tz) set({ ...saved, tz }); });
+            lookUpZone(saved).then((tz) => {
+                const now = get();             // only if the location was not changed meanwhile
+                if (tz && now && now.lat === saved.lat && now.lon === saved.lon && !now.tz) set({ ...now, tz });
+            });
         }
         const dialog = $('locationDialog');
         if (!dialog) return;
@@ -197,10 +210,12 @@ const ObserverLocation = (() => {
                 // Enter picks a suggestion; it never submits the form from the search box.
                 e.preventDefault();
                 if (open && active >= 0) pick(active);
-            } else if (e.key === 'Escape' && !$('locList').hidden) {
-                e.preventDefault();          // close the list, not the dialog
-                e.stopPropagation();
-                closeList();
+            } else if (e.key === 'Escape') {
+                if (!$('locList').hidden) {
+                    e.preventDefault();      // close the list, not the dialog
+                    e.stopPropagation();
+                }
+                closeList();                 // and cancel a search still on its way
             }
         });
         input.addEventListener('blur', () => setTimeout(closeList, 100));

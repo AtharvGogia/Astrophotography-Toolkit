@@ -204,6 +204,7 @@
         const img = $('photo'), svg = $('overlay');
         for (const anim of svg.getAnimations({ subtree: true })) anim.finish();   // no half-drawn lines
         const w = img.naturalWidth, h = img.naturalHeight;
+        if (!w || !h) throw new Error('the photo has not finished loading. Try again in a moment.');
         const clone = svg.cloneNode(true);
         const from = [svg, ...svg.querySelectorAll('*')], to = [clone, ...clone.querySelectorAll('*')];
         from.forEach((node, i) => {
@@ -225,6 +226,7 @@
             ctx.drawImage(img, 0, 0, w, h);
             ctx.drawImage(labels, 0, 0, w, h);
             const blob = await new Promise((ok) => canvas.toBlob(ok, 'image/png'));
+            if (!blob) throw new Error('this browser could not make the PNG (the image may be too large).');
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
             a.download = `${lastFilename.replace(/\.[^.]+$/, '')}-annotated.png`;
@@ -237,6 +239,7 @@
     $('downloadBtn').addEventListener('click', async () => {
         const btn = $('downloadBtn');
         btn.disabled = true;
+        $('analyzerError').textContent = '';
         try { await downloadAnnotated(); }
         catch (err) { $('analyzerError').textContent = 'The image could not be saved: ' + err.message; }
         finally { btn.disabled = false; }

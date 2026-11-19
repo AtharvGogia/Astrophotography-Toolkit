@@ -65,9 +65,9 @@ def _index_ready():
 
 def _prefixed(pairs, q):
     """Indexes of entries whose key starts with q (pairs sorted by key)."""
-    start = bisect.bisect_left(pairs, (q,))
     out = []
-    for key, i in pairs[start:]:
+    for n in range(bisect.bisect_left(pairs, (q,)), len(pairs)):
+        key, i = pairs[n]
         if not key.startswith(q):
             break
         out.append(i)
@@ -79,12 +79,14 @@ def search(query, limit=8):
     q = _fold(name_part)
     if not q:
         return []
-    where = _fold(where_part)
-    where = COUNTRY_ALIASES.get(where, where)
+    # Each comma-separated part after the name must match the region or country:
+    # "paris, tx, usa" and a full label "Tucson, Arizona, United States" both work.
+    where = [_fold(part) for part in where_part.split(',')]
+    where = [COUNTRY_ALIASES.get(w, w) for w in where if w]
     places, names, words = _index_ready()
 
     def ok(p):
-        return not where or any(w.startswith(where) for w in p.where)
+        return all(any(w.startswith(t) for w in p.where) for t in where)
 
     def weight(p):
         return -(p.pop * 10 if q in p.keys else p.pop)

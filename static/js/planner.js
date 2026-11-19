@@ -15,6 +15,7 @@
     $('changeLocation').addEventListener('click', () => ObserverLocation.open());
     window.addEventListener('location-changed', () => {
         showLocation();
+        loadMoonCycle();                        // the strip's dates follow the site's time zone
         if (!$('resultsBody').hidden) $('planForm').requestSubmit();
     });
 
@@ -421,6 +422,7 @@
                 sky.data = data;
                 Astro.saved.put('sky', { key, data });
             } catch (e) {
+                if (sky.key !== key) return;            // a newer plan replaced this one
                 const keep = Astro.saved.get('sky');
                 if (keep && keep.data.key === key) {
                     sky.data = keep.data.data;          // offline: the chart saved with this plan
@@ -529,6 +531,7 @@
         const btn = $('planBtn');
         btn.disabled = true;
         btn.textContent = 'Working…';
+        let shown = null;
         try {
             const resp = await Astro.postJSON('/api/plan', {
                 ...target, lat: loc.lat, lon: loc.lon, start: Astro.utcIso(start), min_alt: Number($('minAlt').value) || 0,
@@ -537,15 +540,21 @@
             if (!resp.ok) throw new Error(data.error || 'Planning failed.');
             Astro.offlineNote($('offlineNote'), null);
             Astro.saved.put('plan', { data, name, loc });
-            render(data, name, loc);
+            shown = [data, name, loc];
         } catch (err) {
             const keep = Astro.saved.get('plan');
             if (Astro.isOffline(err) && keep) {
                 Astro.offlineNote($('offlineNote'), keep.at, `plan for ${keep.data.name}`);
-                render(keep.data.data, keep.data.name, keep.data.loc);
+                shown = [keep.data.data, keep.data.name, keep.data.loc];
             } else {
                 $('formError').textContent = err.message;
             }
+        }
+        // Drawn outside the request's try, so a drawing bug shows as an error, not as "offline".
+        try {
+            if (shown) render(...shown);
+        } catch (err) {
+            $('formError').textContent = 'The plan could not be drawn: ' + err.message;
         } finally {
             btn.disabled = false;
             btn.textContent = 'Plan the night';

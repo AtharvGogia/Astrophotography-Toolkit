@@ -156,10 +156,18 @@ const Astro = (() => {
     // Times show in the observing site's time zone (saved with the location), so a plan for a
     // trip abroad reads in the times you'll see there. Without one, this device's zone is used.
     const deviceZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const zoneOk = {};
+    function knownZone(tz) {             // an older browser may not know a newer zone name
+        if (!(tz in zoneOk)) {
+            try { new Intl.DateTimeFormat('en-US', { timeZone: tz }); zoneOk[tz] = true; }
+            catch (e) { zoneOk[tz] = false; }
+        }
+        return zoneOk[tz];
+    }
     function siteZone() {
         try {
             const loc = JSON.parse(localStorage.getItem('astro-location') || 'null');
-            if (loc && loc.tz) return loc.tz;
+            if (loc && typeof loc.tz === 'string' && knownZone(loc.tz)) return loc.tz;
         } catch (e) { /* storage blocked */ }
         return null;
     }
@@ -189,16 +197,20 @@ const Astro = (() => {
         return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour % 24, min: +p.minute, s: +p.second };
     }
     // The moment a wall-clock time (y, m 1-12, d, hour) happens in the display zone.
+    // A time skipped by a clock change (e.g. 00:00 on a midnight spring-forward) gives the moment
+    // just after the jump, so the date never slips back a day.
+    function offsetAt(t) {
+        const z = zoned(t);
+        return Date.UTC(z.y, z.m - 1, z.d, z.h, z.min, z.s) - t;
+    }
     function zonedToMs(y, m, d, h) {
         const want = Date.UTC(y, m - 1, d, h);
-        let t = want;
-        for (let i = 0; i < 3; i++) {
-            const z = zoned(t);
-            const diff = want - Date.UTC(z.y, z.m - 1, z.d, z.h, z.min, z.s);
-            if (!diff) break;
-            t += diff;
-        }
-        return t;
+        const o1 = offsetAt(want), t1 = want - o1;
+        const o2 = offsetAt(t1);
+        if (o1 === o2) return t1;
+        const t2 = want - o2;
+        if (offsetAt(t2) === o2) return t2;
+        return Math.max(t1, t2);
     }
 
     // Noon at the site on the night that is "tonight" now: before noon, that is still last night.
